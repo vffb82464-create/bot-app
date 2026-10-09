@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="UTF-8" />
+<title>Panel Bot Discord</title>
+<link rel="stylesheet" href="style.css" />
+</head>
+<body>
+
+  <div class="shell">
+    <aside class="sidebar">
+      <div class="brand">
+        <span class="brand-mark">◈</span>
+        <span class="brand-name">panel<em>bot</em></span>
+      </div>
+
+      <div class="session-user">
+        <img id="session-user-avatar" alt="" hidden />
+        <span id="session-user-name">Connecté avec Discord</span>
+        <a href="/auth/logout" class="session-logout">Déconnexion</a>
+      </div>
+
+      <nav class="nav">
+        <button class="nav-item active" data-view="chat">Chat</button>
+        <button class="nav-item" data-view="members">Membres</button>
+        <button class="nav-item" data-view="bots">Bots</button>
+        <button class="nav-item" data-view="voice">Vocal</button>
+        <button class="nav-item" data-view="servers">Serveurs</button>
+        <button class="nav-item" data-view="logs">Logs</button>
+        <button class="nav-item" data-view="commands">Commandes</button>
+        <button class="nav-item" data-view="moderation">Modération</button>
+        <button class="nav-item" data-view="stats">Statistiques</button>
+        <button class="nav-item" data-view="settings">Réglages</button>
+      </nav>
+
+      <div class="status" id="bot-status">
+        <span class="dot" id="status-dot"></span>
+        <span id="status-text">Connexion…</span>
+      </div>
+    </aside>
+
+    <main class="main">
+
+      <!-- CHAT -->
+      <section class="view active" id="view-chat">
+        <header class="view-header">
+          <h1>Chat</h1>
+          <p class="sub" id="chat-target-label">Aucun salon sélectionné</p>
+        </header>
+        <div class="messages" id="messages"></div>
+        <div class="reply-indicator hidden" id="reply-indicator">Réponse à : <span id="reply-target-name"></span></div>
+        <div class="composer-wrap">
+          <div id="mention-suggestions" class="mention-suggestions" role="listbox" aria-label="Suggestions de membres" hidden></div>
+          <form class="composer" id="composer">
+            <input type="text" id="message-input" placeholder="Écris un message… il sera envoyé sur Discord" autocomplete="off" aria-autocomplete="list" aria-controls="mention-suggestions" />
+            <button type="button" id="toggle-gif-search" class="gif-toggle" aria-expanded="false" aria-controls="gif-tools">GIF</button>
+            <button type="submit">Envoyer</button>
+          </form>
+        </div>
+        <section class="panel wide-panel gif-tools" id="gif-tools" aria-label="Recherche de GIF" hidden>
+          <form class="gif-search-form" id="gif-search-form">
+            <input type="text" id="gif-query" maxlength="100" placeholder="Quel GIF cherches-tu ?" autocomplete="off" />
+            <button type="submit" class="btn-primary">Rechercher</button>
+          </form>
+          <p class="log" id="gif-search-status" role="status" aria-live="polite"></p>
+          <div class="gif-results" id="gif-results"></div>
+          <p class="giphy-attribution">Powered by GIPHY</p>
+        </section>
+      </section>
+
+      <!-- MEMBRES -->
+      <section class="view" id="view-members">
+        <header class="view-header">
+          <h1>Membres</h1>
+          <p class="sub">Tous les membres du serveur avec leurs IDs</p>
+        </header>
+
+        <div class="panel wide-panel">
+          <h2>Rechercher un membre</h2>
+          <input type="text" id="member-directory-search" placeholder="Tape le pseudo, le tag ou l'ID..." />
+          <div id="members-list" class="member-list"></div>
+        </div>
+      </section>
+
+      <!-- SERVERS -->
+      <section class="view" id="view-servers">
+        <header class="view-header">
+          <h1>Serveurs</h1>
+          <p class="sub">Le bot doit uniquement rester sur ton serveur.</p>
+        </header>
+
+        <div class="panel wide-panel server-protection-card">
+          <div class="server-protection-heading">
+            <div>
+              <h2>Serveur à conserver</h2>
+              <p id="server-protection-status" class="sub" role="status" aria-live="polite">Vérification de la connexion…</p>
+            </div>
+            <span class="server-shield" aria-hidden="true">◆</span>
+          </div>
+          <div class="protected-server">
+            <strong id="protected-server-name">Chargement…</strong>
+            <code id="protected-server-id">1508431497433190420</code>
+          </div>
+          <h3>Autres serveurs du bot</h3>
+          <div id="managed-server-list" class="managed-server-list"></div>
+          <div class="server-protection-actions">
+            <button id="leave-other-servers-btn" type="button" class="btn-danger">Quitter tous les autres serveurs</button>
+            <button id="refresh-servers-btn" type="button" class="btn-secondary">Actualiser</button>
+          </div>
+          <p id="server-action-status" class="log" role="status" aria-live="polite"></p>
+          <p class="server-safety-note">Le nettoyage ne sera lancé qu’après confirmation. Si le serveur à conserver n’est pas trouvé, aucun autre serveur ne sera quitté.</p>
+        </div>
+      </section>
+
+      <!-- LOGS -->
+      <section class="view" id="view-logs">
+        <header class="view-header">
+          <h1>Logs</h1>
+          <p class="sub">Suivi rapide du serveur et des actions</p>
+        </header>
+
+        <div class="dashboard-grid">
+          <div class="dash-card">
+            <span class="dash-label">Membres</span>
+            <strong id="log-members">0</strong>
+          </div>
+          <div class="dash-card">
+            <span class="dash-label">En ligne</span>
+            <strong id="log-online">0</strong>
+          </div>
+          <div class="dash-card">
+            <span class="dash-label">Bots</span>
+            <strong id="log-bots">0</strong>
+          </div>
+          <div class="dash-card">
+            <span class="dash-label">Salons</span>
+            <strong id="log-channels">0</strong>
+          </div>
+        </div>
+
+        <div class="panel wide-panel">
+          <h2>Activité récente</h2>
+          <div id="activity-list" class="activity-feed" aria-live="polite"></div>
+        </div>
+      </section>
+
+      <!-- COMMANDES -->
+      <section class="view" id="view-commands">
+        <header class="view-header">
+          <h1>Commandes</h1>
+          <p class="sub">Raccourcis utiles pour agir vite</p>
+        </header>
+
+        <div class="quick-grid">
+          <button class="quick-card quick-link" data-target="moderation">
+            <span>⚠️</span>
+            <strong>Modération</strong>
+            <small>Warn, mute, kick, ban</small>
+          </button>
+          <button class="quick-card quick-link" data-target="members">
+            <span>👥</span>
+            <strong>Membres</strong>
+            <small>Voir tous les IDs</small>
+          </button>
+          <button class="quick-card quick-link" data-target="bots">
+            <span>🤖</span>
+            <strong>Bots</strong>
+            <small>IDs et messages</small>
+          </button>
+          <button class="quick-card quick-link" data-target="stats">
+            <span>📊</span>
+            <strong>Statistiques</strong>
+            <small>Vue du serveur</small>
+          </button>
+          <button class="quick-card quick-link" data-target="settings">
+            <span>⚙️</span>
+            <strong>Réglages</strong>
+            <small>Serveur et salon</small>
+          </button>
+          <button class="quick-card" id="announce-quick-btn">
+            <span>📣</span>
+            <strong>Annonce</strong>
+            <small>Publier un message</small>
+          </button>
+        </div>
+      </section>
+
+      <!-- BOTS -->
+      <section class="view" id="view-bots">
+        <header class="view-header">
+          <h1>Bots</h1>
+          <p class="sub">IDs des bots et messages globaux</p>
+        </header>
+
+        <div class="panel">
+          <h2>Rechercher un bot</h2>
+          <input type="text" id="bot-search" placeholder="Tape le pseudo du bot..." />
+          <div id="bots-list" class="bot-list"></div>
+        </div>
+
+        <div class="panel wide-panel">
+          <h2>Messages des bots</h2>
+          <div id="bot-feed" class="bot-feed"></div>
+        </div>
+      </section>
+
+      <!-- MODERATION -->
+      <section class="view" id="view-moderation">
+        <header class="view-header">
+          <h1>Modération</h1>
+          <p class="sub">Annonces et actions sur les membres</p>
+        </header>
+
+        <div class="panel">
+          <h2>Annonce</h2>
+          <input type="text" id="announce-title" placeholder="Titre de l'annonce" />
+          <textarea id="announce-body" rows="3" placeholder="Contenu de l'annonce"></textarea>
+          <button class="btn-primary" id="announce-btn">Publier l'annonce</button>
+        </div>
+
+        <div class="panel">
+          <h2>Action sur un membre</h2>
+          <input type="text" id="member-search" placeholder="Rechercher un membre..." />
+          <select id="member-select"></select>
+          <input type="text" id="action-reason" placeholder="Raison (optionnel)" />
+          <div class="row action-row compact">
+            <button class="btn-warning" id="warn-btn">Warn</button>
+            <button class="btn-secondary" id="mute-5m-btn">Mute 5m</button>
+            <button class="btn-secondary" id="mute-1h-btn">Mute 1h</button>
+          </div>
+          <div class="row action-row compact">
+            <button class="btn-danger" id="kick-btn">Kick</button>
+            <button class="btn-danger" id="ban-btn">Ban</button>
+          </div>
+        </div>
+
+        <p class="log" id="mod-log"></p>
+      </section>
+
+      <!-- STATS -->
+      <section class="view" id="view-stats">
+        <header class="view-header">
+          <h1>Statistiques</h1>
+          <p class="sub" id="stats-guild-name">—</p>
+        </header>
+        <div class="stat-grid">
+          <div class="stat-card">
+            <span class="stat-value" id="stat-members">—</span>
+            <span class="stat-label">Membres</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-online">—</span>
+            <span class="stat-label">En ligne</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-channels">—</span>
+            <span class="stat-label">Salons</span>
+          </div>
+          <div class="stat-card">
+            <span class="stat-value" id="stat-boosts">—</span>
+            <span class="stat-label">Boosts</span>
+          </div>
+        </div>
+        <button class="btn-secondary" id="refresh-stats">Actualiser</button>
+      </section>
+
+      <!-- VOCAL -->
+      <section class="view" id="view-voice">
+        <header class="view-header">
+          <h1>Vocal &amp; utilitaires</h1>
+          <p class="sub">Connecte le bot dans un salon vocal et configure ses outils rapides</p>
+        </header>
+
+        <div class="panel">
+          <h2>Connexion vocale</h2>
+          <select id="voice-channel-select"></select>
+          <div class="row action-row compact">
+            <button class="btn-primary" id="join-voice-btn">Rejoindre</button>
+            <button class="btn-secondary" id="leave-voice-btn">Quitter</button>
+          </div>
+          <p class="log" id="voice-status-label">Aucun salon vocal actif.</p>
+        </div>
+
+
+        <div class="panel">
+          <h2>Statut du bot</h2>
+          <input type="text" id="bot-status-text" placeholder="Ex: En réunion / Live / Support" />
+          <button class="btn-primary" id="set-status-btn">Mettre le statut</button>
+        </div>
+      </section>
+
+      <!-- SETTINGS -->
+      <section class="view" id="view-settings">
+        <header class="view-header">
+          <h1>Réglages</h1>
+          <p class="sub">Choisis le serveur et le salon cible du bot</p>
+        </header>
+
+        <div class="panel">
+          <label>Serveur</label>
+          <select id="guild-select"></select>
+
+          <label>Salon cible</label>
+          <select id="channel-select"></select>
+
+          <div class="welcome-settings">
+            <h2>Accueil automatique</h2>
+            <label class="toggle-label">
+              <input type="checkbox" id="welcome-enabled" />
+              Accueillir les nouveaux membres
+            </label>
+            <label for="welcome-channel-select">Salon de bienvenue</label>
+            <select id="welcome-channel-select"></select>
+            <label for="welcome-message">Message de bienvenue</label>
+            <textarea id="welcome-message" rows="3" maxlength="2000" placeholder="Bienvenue {user} sur {server} !"></textarea>
+            <p class="hint">Variables : <code>{user}</code> mentionne le membre, <code>{username}</code> affiche son pseudo, <code>{server}</code> le serveur et <code>{count}</code> le nombre de membres.</p>
+          </div>
+
+          <button class="btn-primary" id="save-settings-btn">Enregistrer</button>
+          <p class="log" id="settings-log"></p>
+        </div>
+
+        <div class="panel note">
+          <h2>Astuce</h2>
+          <p>Depuis un terminal, tu peux aussi envoyer un message directement sans ouvrir l'appli :</p>
+          <code>npm run send -- "Ton message ici"</code>
+        </div>
+      </section>
+
+    </main>
+  </div>
+
+  <script src="web-bridge.js"></script>
+  <script src="renderer.js"></script>
+</body>
+</html>

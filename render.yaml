@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: panel-bot-discord
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: npm run web
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: 22
+      - key: DISCORD_TOKEN
+        sync: false
+      - key: DISCORD_CLIENT_ID
+        sync: false
+      - key: DISCORD_CLIENT_SECRET
+        sync: false
+      - key: DISCORD_REDIRECT_URI
+        sync: false
+      - key: SESSION_SECRET
+        generateValue: true
+      - key: GIPHY_API_KEY
+        sync: false

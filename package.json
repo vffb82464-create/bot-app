@@ -1,0 +1,64 @@
+{
+  "name": "discord-bot-app",
+  "productName": "Discord Bot App",
+  "version": "1.0.0",
+  "description": "Application de bureau connectée à ton bot Discord",
+  "main": "main.js",
+  "scripts": {
+    "start": "electron .",
+    "web": "node web-server.js",
+    "send": "node send.js",
+    "shortcut": "powershell -ExecutionPolicy Bypass -File ./update-desktop-shortcut.ps1",
+    "dist:mac": "electron-builder --mac"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@discordjs/voice": "^0.18.0",
+    "discord.js": "^14.15.3",
+    "dotenv": "^16.4.5",
+    "express": "^5.1.0",
+    "express-session": "^1.18.2",
+    "ffmpeg-static": "^5.3.0",
+    "play-dl": "^1.9.7"
+  },
+  "devDependencies": {
+    "electron": "32.3.3",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.discordbotapp.desktop",
+    "productName": "Discord Bot App",
+    "directories": {
+      "output": "dist"
+    },
+    "asarUnpack": [
+      "node_modules/ffmpeg-static/**"
+    ],
+    "extraResources": [
+      {
+        "from": ".env.example",
+        "to": ".env.example"
+      }
+    ],
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        },
+        {
+          "target": "zip",
+          "arch": [
+            "x64",
+            "arm64"
+          ]
+        }
+      ]
+    }
+  }
+}
