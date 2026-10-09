@@ -444,7 +444,7 @@ h2{margin:0;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:26p
 .server-badge-copy strong{display:block;overflow-wrap:anywhere;color:#eff0fa;font-size:13px}
 .privacy-note{margin:18px 0 0;color:#828493;font-size:11px;line-height:1.6;text-align:center}
 @media(max-width:760px){body{padding:max(24px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom))}.login-layout{max-width:460px;grid-template-columns:1fr;gap:25px}.intro{padding:0}.eyebrow{margin:23px 0 10px}h1{font-size:clamp(34px,10vw,46px)}.lead{margin-top:12px;font-size:15px;line-height:1.55}.features{grid-template-columns:1fr;gap:9px;margin-top:19px}.features li{font-size:13px}.feature-icon{width:30px;height:30px}.login-card{padding:23px;border-radius:19px}.card-copy{margin-bottom:18px}}
-@media(max-width:380px){body{padding-right:13px;padding-left:13px}.features{display:none}.login-card{padding:20px}}
+@media(max-width:380px){html,body{width:100%;min-width:0}body{padding-right:13px;padding-left:13px}.features{display:none}.login-card{padding:20px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
 </style></head><body><div class="login-layout">
 <section class="intro" aria-labelledby="welcome-title">
