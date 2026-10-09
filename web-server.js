@@ -590,7 +590,7 @@ function requestHostedBotCommand(name, args) {
   });
 }
 
-app.get('/api/founder/bot/status', verifyFounder, (req, res) => {
+app.get('/api/founder/bot/status', requireFounder, (req, res) => {
   const snapshotFresh = Date.now() - remoteBotSnapshot.lastSeen < 120000;
   res.json({
     configured: snapshotFresh && remoteBotSnapshot.founderBot.configured,
@@ -599,7 +599,7 @@ app.get('/api/founder/bot/status', verifyFounder, (req, res) => {
   });
 });
 
-app.get('/api/founder/bot/messages', verifyFounder, async (req, res) => {
+app.get('/api/founder/bot/messages', requireFounder, async (req, res) => {
   const channelId = String(req.query.channelId || '');
   if (!/^\d{17,20}$/.test(channelId)) return res.status(400).json({ error: 'Choisis un salon Discord valide.' });
   try {
