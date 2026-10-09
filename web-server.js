@@ -59,7 +59,7 @@ app.use((req, res, next) => {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   next();
 });
-app.use(express.json({ limit: '128kb' }));
+app.use(express.json({ limit: '2mb' }));
 app.use(session({
   name: 'panel.sid',
   secret: SESSION_SECRET,
@@ -106,7 +106,19 @@ let activeVoiceConnection = null;
 let audioPlayer = null;
 let currentMusic = { title: '', playing: false };
 let botLoginError = null;
-let remoteBotSnapshot = { connected: false, guilds: [], lastSeen: 0 };
+let remoteBotSnapshot = {
+  connected: false,
+  guilds: [],
+  config: null,
+  logs: [],
+  tag: null,
+  voiceStatus: { connected: false },
+  musicStatus: { title: '', playing: false },
+  lastSeen: 0,
+};
+const pendingBotCommands = [];
+const waitingBotCommands = new Map();
+let botPollWaiter = null;
 
 function loadJson(filePath, fallback) {
   try {
@@ -151,9 +163,9 @@ function recordActivity(type, message, details = {}) {
 
 function configForUser() {
   return {
-    ...config,
+    ...(remoteBotSnapshot.config || config),
     guildId: ALLOWED_GUILD_ID,
-    readOnly: BOT_SYNC_ONLY,
+    readOnly: false,
   };
 }
 
@@ -255,10 +267,123 @@ app.post('/api/bot-sync', (req, res) => {
     });
   }
   remoteBotSnapshot = {
+    ...remoteBotSnapshot,
     connected,
     guilds: normalizedGuilds,
     lastSeen: Date.now(),
   };
+  return res.sendStatus(204);
+});
+
+function authenticateHostedBot(req, res) {
+  const suppliedSecret = req.get('authorization')?.replace(/^Bearer\s+/i, '') || '';
+  const expected = Buffer.from(BOT_SYNC_SECRET || '');
+  const supplied = Buffer.from(suppliedSecret);
+  if (!BOT_SYNC_SECRET || expected.length !== supplied.length || !crypto.timingSafeEqual(expected, supplied)) {
+    res.sendStatus(401);
+    return false;
+  }
+  return true;
+}
+
+function updateHostedBotSnapshot(snapshot) {
+  if (!snapshot || typeof snapshot.connected !== 'boolean' || !Array.isArray(snapshot.guilds)
+      || snapshot.guilds.length > 500) {
+    throw new Error('Invalid bot snapshot.');
+  }
+  const guilds = snapshot.guilds.map((guild) => {
+    if (!guild || typeof guild.id !== 'string' || !/^\d{17,20}$/.test(guild.id)
+        || typeof guild.name !== 'string' || guild.name.length > 100) {
+      throw new Error('Invalid guild entry.');
+    }
+    return {
+      id: guild.id,
+      name: guild.name,
+      memberCount: Number.isInteger(guild.memberCount) && guild.memberCount >= 0 ? guild.memberCount : 0,
+    };
+  });
+  const incomingLogs = Array.isArray(snapshot.logs)
+    ? snapshot.logs.filter((entry) => entry && typeof entry.message === 'string').slice(0, MAX_ACTIVITY_LOGS)
+    : remoteBotSnapshot.logs;
+  const now = Date.now();
+  remoteBotSnapshot = {
+    ...remoteBotSnapshot,
+    connected: snapshot.connected,
+    guilds,
+    config: snapshot.config && typeof snapshot.config === 'object' ? snapshot.config : remoteBotSnapshot.config,
+    logs: incomingLogs,
+    tag: typeof snapshot.tag === 'string' ? snapshot.tag : remoteBotSnapshot.tag,
+    voiceStatus: snapshot.voiceStatus && typeof snapshot.voiceStatus === 'object'
+      ? snapshot.voiceStatus
+      : remoteBotSnapshot.voiceStatus,
+    musicStatus: snapshot.musicStatus && typeof snapshot.musicStatus === 'object'
+      ? snapshot.musicStatus
+      : remoteBotSnapshot.musicStatus,
+    lastSeen: now,
+  };
+  if (Array.isArray(snapshot.events)) {
+    for (const entry of snapshot.events.slice(0, 100)) {
+      if (!entry || typeof entry.name !== 'string' || !entry.data || typeof entry.data !== 'object') continue;
+      if (['new-message', 'bot-message', 'activity-log', 'voice-status', 'music-status'].includes(entry.name)) {
+        sendEvent(entry.name, entry.data);
+      }
+    }
+  }
+  broadcastBotStatus({
+    connected: snapshot.connected,
+    tag: typeof snapshot.tag === 'string' ? snapshot.tag : undefined,
+  });
+  if (snapshot.voiceStatus) getVoiceStatus(snapshot.voiceStatus);
+  if (snapshot.musicStatus) getMusicStatus(snapshot.musicStatus);
+}
+
+function deliverNextBotCommand() {
+  if (!botPollWaiter || !pendingBotCommands.length) return;
+  const command = pendingBotCommands.shift();
+  const respond = botPollWaiter;
+  botPollWaiter = null;
+  respond(command);
+}
+
+app.post('/api/bot-poll', (req, res) => {
+  if (!authenticateHostedBot(req, res)) return;
+  try {
+    updateHostedBotSnapshot(req.body?.snapshot);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+  if (pendingBotCommands.length) {
+    return res.json({ command: pendingBotCommands.shift() });
+  }
+  if (botPollWaiter) return res.status(409).json({ error: 'A bot poll is already waiting.' });
+
+  let finished = false;
+  const finish = (payload) => {
+    if (finished) return;
+    finished = true;
+    clearTimeout(timeout);
+    botPollWaiter = null;
+    if (!res.destroyed && !res.writableEnded) res.json({ command: payload });
+  };
+  const timeout = setTimeout(() => finish(null), 20000);
+  botPollWaiter = finish;
+  res.on('close', () => {
+    if (!res.writableEnded) finish(null);
+  });
+});
+
+app.post('/api/bot-result', (req, res) => {
+  if (!authenticateHostedBot(req, res)) return;
+  const { requestId, result, error } = req.body || {};
+  if (typeof requestId !== 'string' || requestId.length > 100) {
+    return res.status(400).json({ error: 'Invalid command result.' });
+  }
+  const pending = waitingBotCommands.get(requestId);
+  if (!pending) return res.sendStatus(404);
+  waitingBotCommands.delete(requestId);
+  clearTimeout(pending.timeout);
+  if (error && typeof error === 'string') pending.reject(new Error(error.slice(0, 1000)));
+  else pending.resolve(result);
   return res.sendStatus(204);
 });
 
@@ -405,11 +530,18 @@ app.get('/api/events', verifyRequiredRole, (req, res) => {
   res.flushHeaders();
   res.write('retry: 3000\n\n');
   const initial = [
-    ['bot-status', { connected: client.isReady(), tag: client.user?.tag, error: botLoginError }],
-    ['voice-status', activeVoiceConnection
+    ['bot-status', BOT_SYNC_ONLY
+      ? {
+        connected: remoteBotSnapshot.connected && Date.now() - remoteBotSnapshot.lastSeen < 120000,
+        tag: remoteBotSnapshot.tag,
+      }
+      : { connected: client.isReady(), tag: client.user?.tag, error: botLoginError }],
+    ['voice-status', BOT_SYNC_ONLY
+      ? remoteBotSnapshot.voiceStatus || { connected: false }
+      : activeVoiceConnection
       ? { connected: true, guildId: activeVoiceConnection.joinConfig.guildId, channelId: activeVoiceConnection.joinConfig.channelId }
       : { connected: false }],
-    ['music-status', currentMusic],
+    ['music-status', BOT_SYNC_ONLY ? remoteBotSnapshot.musicStatus || currentMusic : currentMusic],
   ];
   for (const [name, data] of initial) {
     res.write(`event: ${name}\ndata: ${JSON.stringify(data)}\n\n`);
@@ -677,7 +809,7 @@ async function executeCommand(name, args) {
     case 'getGuilds': {
       if (BOT_SYNC_ONLY) {
         return remoteBotSnapshot.connected && Date.now() - remoteBotSnapshot.lastSeen < 120000
-          ? remoteBotSnapshot.guilds
+          ? remoteBotSnapshot.guilds.filter((guild) => guild.id === ALLOWED_GUILD_ID)
           : [];
       }
       const guild = client.guilds.cache.get(ALLOWED_GUILD_ID);
@@ -709,7 +841,7 @@ async function executeCommand(name, args) {
           && Date.now() - remoteBotSnapshot.lastSeen < 120000;
         return {
           connected,
-          canManage: false,
+          canManage: connected,
           allowedGuildId: ALLOWED_GUILD_ID,
           allowedGuildName: remoteBotSnapshot.guilds.find((guild) => guild.id === ALLOWED_GUILD_ID)?.name || null,
           guilds: connected
@@ -765,7 +897,7 @@ async function executeCommand(name, args) {
       };
     }
     case 'getActivityLogs':
-      return activityLogs;
+      return BOT_SYNC_ONLY ? remoteBotSnapshot.logs : activityLogs;
     case 'sendMessage': {
       const input = args[0] || {};
       const channel = await fetchTextChannel(input.channelId);
@@ -1006,6 +1138,21 @@ app.post('/api/command', async (req, res) => {
     return res.status(400).json({ error: 'Commande invalide.' });
   }
   try {
+    if (BOT_SYNC_ONLY && name !== 'searchGifs' && name !== 'getServerOverview') {
+      const connected = remoteBotSnapshot.connected && Date.now() - remoteBotSnapshot.lastSeen < 120000;
+      if (!connected) throw new Error('Le bot hébergé est hors ligne ou ne répond pas. Vérifie hosting-bot.net.');
+      const requestId = crypto.randomUUID();
+      const result = await new Promise((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          waitingBotCommands.delete(requestId);
+          reject(new Error('Le bot ne répond pas à temps. Réessaie dans un instant.'));
+        }, 120000);
+        waitingBotCommands.set(requestId, { resolve, reject, timeout });
+        pendingBotCommands.push({ requestId, name, args });
+        deliverNextBotCommand();
+      });
+      return res.json({ result });
+    }
     const result = await executeCommand(name, args);
     return res.json({ result });
   } catch (error) {

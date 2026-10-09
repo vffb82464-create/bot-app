@@ -78,9 +78,15 @@ npm install
 
 Le site refuse les comptes sans ce rôle et revérifie le rôle périodiquement ainsi qu’avant les actions. Le bot doit être membre du serveur autorisé et y disposer des permissions correspondant aux fonctions utilisées. Les clés restent dans **Environment** sur Render, jamais dans GitHub. Le service gratuit n’offre pas de disque persistant : ses journaux locaux peuvent être effacés lorsque Render redémarre ou redéploie le service. Pour conserver les journaux, configure un disque persistant Render et `DATA_DIR=/var/data`.
 
-### Bot déjà hébergé ailleurs : affichage des serveurs en lecture seule
+### Bot déjà hébergé ailleurs : commandes du panel
 
-Le site Render ne doit pas démarrer une seconde connexion avec le token du bot. Crée une valeur secrète aléatoire d’au moins 32 caractères et ajoute-la sous `BOT_SYNC_SECRET` dans **Environment** sur Render et dans l’environnement du bot hébergé. Garde la même valeur privée des deux côtés. Dans le `index.js` du bot, ajoute après la création de `client` ce relais HTTPS :
+Pour contrôler le bot distant, remplace `index.js` et `package.json` sur hosting-bot.net par les deux fichiers complets fournis avec cette mise à jour. Fais une sauvegarde des fichiers actuels avant de les remplacer. Le manifeste conserve les dépendances existantes et ajoute `@discordjs/voice` et `play-dl` pour les fonctions vocales et musicales.
+
+Dans **Env** de hosting-bot.net, garde `BOT_SYNC_SECRET` identique à la valeur configurée dans **Environment** sur Render. Le bot ouvre une connexion HTTPS sortante vers Render : il n’est pas nécessaire d’ajouter un port entrant ni de démarrer un second bot sur Render. Après le remplacement des fichiers, redémarre le bot et vérifie les logs. Active aussi **SERVER MEMBERS INTENT** et **PRESENCE INTENT** dans le portail développeur Discord pour utiliser les membres et les statistiques de présence.
+
+Le relais prend en charge les salons, messages, membres, modération, réglages, vocal, musique, logs et serveurs, uniquement sur le serveur autorisé `1508431497433190420`. L’action qui fait quitter le bot des autres serveurs demande une confirmation dans le panel. Le compte connecté au panel doit avoir le rôle `1540132253097664572`.
+
+Le bloc ci-dessous est l’ancien relais de lecture seule : ne l’ajoute pas si tu utilises les deux fichiers complets mentionnés ci-dessus.
 
 ```js
 const PANEL_SYNC_URL = 'https://panel-bot-discord.onrender.com/api/bot-sync';
