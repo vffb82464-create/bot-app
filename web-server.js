@@ -573,7 +573,8 @@ app.get('/web-bridge.js', verifyRequiredRole, (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'web-bridge.js'));
 });
 
-app.get('/style.css', verifyRequiredRole, (req, res) => {
+app.get('/style.css', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=3600');
   res.type('text/css').sendFile(path.join(__dirname, 'style.css'));
 });
 
