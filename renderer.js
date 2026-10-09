@@ -29,7 +29,7 @@ async function welcomeRobotAfterUpdate() {
     const storageKey = 'panel-bot-seen-release';
     const previousVersion = localStorage.getItem(storageKey);
     localStorage.setItem(storageKey, payload.version);
-    if (!previousVersion || previousVersion === payload.version) return;
+    if (previousVersion === payload.version) return;
 
     const dialog = document.getElementById('update-greeting');
     const message = document.getElementById('update-greeting-message');
