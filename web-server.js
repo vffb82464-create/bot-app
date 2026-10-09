@@ -590,6 +590,11 @@ app.get('/style.css', (req, res) => {
   res.type('text/css').sendFile(path.join(__dirname, 'style.css'));
 });
 
+app.get('/api/app-version', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ version: process.env.RENDER_GIT_COMMIT || process.env.APP_VERSION || 'development' });
+});
+
 app.get('/api/session', verifyRequiredRole, (req, res) => {
   if (!req.session.csrfToken) req.session.csrfToken = crypto.randomBytes(32).toString('hex');
   res.json({

@@ -7,8 +7,8 @@
 <link rel="manifest" href="/manifest.webmanifest" />
 <link rel="apple-touch-icon" href="/icons/panel-192.png" />
 <title>Panel Bot Discord</title>
-<link rel="stylesheet" href="style.css?v=server-logo-2" />
-<script src="/pwa.js?v=server-logo-2" defer></script>
+<link rel="stylesheet" href="style.css?v=robot-update-1" />
+<script src="/pwa.js?v=robot-update-1" defer></script>
 </head>
 <body>
 
@@ -356,7 +356,26 @@
     </main>
   </div>
 
+  <dialog class="update-greeting" id="update-greeting" aria-labelledby="update-greeting-title" aria-describedby="update-greeting-message">
+    <div class="update-robot" aria-hidden="true">
+      <svg viewBox="0 0 96 96" focusable="false">
+        <path class="update-robot-antenna" d="M48 12v12" />
+        <circle class="update-robot-antenna-light" cx="48" cy="10" r="5" />
+        <path class="update-robot-ear" d="M20 43h-5a6 6 0 0 0-6 6v10a6 6 0 0 0 6 6h5zm56 0h5a6 6 0 0 1 6 6v10a6 6 0 0 1-6 6h-5z" />
+        <rect class="update-robot-face" x="19" y="25" width="58" height="52" rx="17" />
+        <circle class="update-robot-eye" cx="38" cy="49" r="4" />
+        <circle class="update-robot-eye" cx="58" cy="49" r="4" />
+        <path class="update-robot-mouth" d="M42 63h12" />
+        <path class="update-robot-shine" d="M29 36a8 8 0 0 1 8-6" />
+      </svg>
+    </div>
+    <p class="update-greeting-kicker">Nouvelle mise à jour</p>
+    <h2 id="update-greeting-title">Le petit robot est de retour !</h2>
+    <p class="update-greeting-message" id="update-greeting-message">Il vient d’être mis à jour. Tu peux simplement lui dire bonjour.</p>
+    <button class="btn-primary update-greeting-button" id="update-greeting-button" type="button">Bonjour !</button>
+  </dialog>
+
   <script src="web-bridge.js"></script>
-  <script src="renderer.js?v=server-logo-2"></script>
+  <script src="renderer.js?v=robot-update-1"></script>
 </body>
 </html>

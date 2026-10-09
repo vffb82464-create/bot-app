@@ -15,6 +15,49 @@ function playMobileLogoAnimation() {
 
 window.addEventListener('pageshow', playMobileLogoAnimation);
 
+async function welcomeRobotAfterUpdate() {
+  if (window.location.protocol === 'file:') return;
+
+  try {
+    const response = await fetch('/api/app-version', { cache: 'no-store' });
+    if (!response.ok) throw new Error(`Version du panel indisponible (${response.status}).`);
+    const payload = await response.json();
+    if (typeof payload.version !== 'string' || !payload.version) {
+      throw new Error('Le serveur n’a pas retourné de version valide.');
+    }
+
+    const storageKey = 'panel-bot-seen-release';
+    const previousVersion = localStorage.getItem(storageKey);
+    localStorage.setItem(storageKey, payload.version);
+    if (!previousVersion || previousVersion === payload.version) return;
+
+    const dialog = document.getElementById('update-greeting');
+    const message = document.getElementById('update-greeting-message');
+    const button = document.getElementById('update-greeting-button');
+    if (!dialog || !message || !button) {
+      throw new Error('La fenêtre du robot de mise à jour est introuvable.');
+    }
+
+    button.addEventListener('click', () => {
+      if (dialog.classList.contains('is-replied')) {
+        dialog.close();
+        return;
+      }
+
+      dialog.classList.add('is-replied');
+      message.textContent = 'Bonjour ! Ça me fait plaisir de te revoir. 😊';
+      button.textContent = 'Fermer';
+      button.focus();
+    });
+    dialog.showModal();
+    button.focus();
+  } catch (error) {
+    console.error('Impossible de vérifier la mise à jour du petit robot :', error);
+  }
+}
+
+welcomeRobotAfterUpdate();
+
 const navItems = document.querySelectorAll('.nav-item');
 const views = document.querySelectorAll('.view');
 if (window.location.protocol === 'file:') {
