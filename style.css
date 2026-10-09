@@ -1188,3 +1188,208 @@ button {
   font-size: 12px;
   color: var(--text-dim);
 }
+
+/* ---------- Presentation refresh ---------- */
+
+body {
+  background:
+    radial-gradient(ellipse at 78% -12%, rgba(108, 108, 245, 0.11), transparent 35%),
+    var(--bg);
+}
+
+.sidebar {
+  width: 244px;
+  padding: 22px 16px;
+  background: rgba(26, 28, 36, 0.96);
+}
+
+.brand {
+  align-items: center;
+  padding: 0 8px 20px;
+}
+
+.brand-mark {
+  display: inline-grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border: 1px solid rgba(108, 108, 245, 0.28);
+  border-radius: 11px;
+  background: var(--accent-soft);
+}
+
+.brand-name {
+  font-size: 18px;
+}
+
+.nav {
+  gap: 4px;
+}
+
+.nav-item {
+  min-height: 40px;
+  border-radius: 9px;
+  transition: background 150ms ease, color 150ms ease;
+}
+
+.nav-item.active {
+  box-shadow: inset 2px 0 var(--accent);
+}
+
+.status {
+  margin-top: 12px;
+  border-top-color: rgba(255, 255, 255, 0.08);
+}
+
+.view {
+  padding: 32px clamp(20px, 3vw, 44px);
+}
+
+.view-header {
+  margin-bottom: 24px;
+}
+
+.view-header h1 {
+  font-size: clamp(23px, 2.2vw, 29px);
+  letter-spacing: -0.035em;
+}
+
+.sub {
+  margin-top: 5px;
+  line-height: 1.55;
+}
+
+.panel,
+.dash-card,
+.stat-card {
+  border-color: rgba(255, 255, 255, 0.09);
+  border-radius: 14px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+}
+
+.panel {
+  padding: 20px;
+}
+
+.panel h2 {
+  margin-bottom: 14px;
+  font-size: 16px;
+  letter-spacing: -0.015em;
+}
+
+button,
+input,
+select,
+textarea {
+  border-radius: 9px;
+}
+
+button {
+  transition: transform 140ms ease, filter 140ms ease, border-color 140ms ease;
+}
+
+button:not(:disabled):hover {
+  filter: brightness(1.1);
+}
+
+button:not(:disabled):active {
+  transform: translateY(1px);
+}
+
+input:focus-visible,
+select:focus-visible,
+textarea:focus-visible,
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid #a1a2ff;
+  outline-offset: 2px;
+}
+
+.msg-body,
+.activity-entry,
+.managed-server-row {
+  border-radius: 12px;
+}
+
+.messages {
+  scrollbar-color: #383b4a transparent;
+  scrollbar-width: thin;
+}
+
+@media (max-width: 760px) {
+  body {
+    background:
+      radial-gradient(ellipse at 50% -20%, rgba(108, 108, 245, 0.12), transparent 42%),
+      var(--bg);
+  }
+
+  .sidebar {
+    padding: 10px 12px 0;
+    background: rgba(26, 28, 36, 0.97);
+    backdrop-filter: blur(14px);
+  }
+
+  .brand {
+    padding: 0 4px 8px;
+  }
+
+  .brand-mark {
+    width: 30px;
+    height: 30px;
+  }
+
+  .brand-name {
+    font-size: 16px;
+  }
+
+  .nav {
+    display: flex;
+    gap: 6px;
+    overflow-x: auto;
+    overflow-y: hidden;
+    padding: 1px 1px 9px;
+    scrollbar-width: none;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  .nav::-webkit-scrollbar {
+    display: none;
+  }
+
+  .nav-item {
+    flex: 0 0 auto;
+    min-width: max-content;
+    min-height: 36px;
+    padding: 7px 12px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: 12px;
+    white-space: nowrap;
+  }
+
+  .nav-item.active {
+    border-color: rgba(108, 108, 245, 0.24);
+    box-shadow: none;
+  }
+
+  .status {
+    margin: 0;
+  }
+
+  .view {
+    padding: 18px 14px;
+  }
+
+  .view-header {
+    margin-bottom: 17px;
+  }
+
+  .panel {
+    padding: 16px;
+  }
+
+  .dash-card,
+  .stat-card {
+    border-radius: 12px;
+  }
+}

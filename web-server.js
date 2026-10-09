@@ -393,25 +393,70 @@ app.get('/login', (req, res) => {
     ? 'Ton compte n’a pas le rôle Discord requis.'
     : req.query.denied === 'guild'
       ? 'Impossible de vérifier ton appartenance au serveur autorisé.'
-      : '';
+      : req.query.denied === 'oauth'
+        ? 'La connexion Discord a été annulée ou a échoué. Réessaie.'
+        : '';
   res.type('html').send(`<!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121319"><link rel="manifest" href="/manifest.webmanifest">
-<link rel="apple-touch-icon" href="/icons/app-192.png"><script src="/pwa.js" defer></script>
-<title>Panel Bot — Connexion</title><style>
-*{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#121319;color:#e7e7ea;font:16px Inter,system-ui,sans-serif}
-main{width:min(440px,calc(100% - 32px));padding:32px;border:1px solid #2a2d38;border-radius:16px;background:#1a1c24;text-align:center}
-h1{margin:0 0 10px;font-size:28px}p{color:#aeb0bb;line-height:1.6}.error{color:#f77b82}
-a{display:inline-block;margin-top:14px;padding:13px 20px;border-radius:8px;background:#5865f2;color:white;text-decoration:none;font-weight:700}
-button{display:block;margin:12px auto 0;padding:11px 18px;border:1px solid #414454;border-radius:8px;background:#20222c;color:#e7e7ea;font:inherit;font-weight:700}
-small{display:block;margin-top:20px;color:#8b8d98;line-height:1.5}
-</style></head><body><main><h1>◈ Panel Bot</h1>
-<p>Connecte-toi avec Discord. L’accès est réservé aux membres du serveur autorisé qui ont le rôle requis.</p>
-${denied ? `<p class="error">${denied}</p>` : ''}
-<a href="/auth/discord">Continuer avec Discord</a>
-<button id="install-app-btn" type="button">Installer sur ce téléphone</button>
-<small id="install-app-status" role="status" aria-live="polite"></small>
-<small>Le site vérifie ton rôle Discord avant de donner accès au panel.</small></main></body></html>`);
+<link rel="apple-touch-icon" href="/icons/app-192.png"><link rel="stylesheet" href="/style.css?v=access-redesign-1">
+<script src="/pwa.js?v=access-redesign-1" defer></script>
+<title>Connexion Discord — Panel Bot</title><style>
+*{box-sizing:border-box}
+html{min-height:100%;background:#101117}
+body{height:auto;min-height:100vh;min-height:100svh;overflow:auto;margin:0;display:grid;place-items:center;padding:32px 20px;color:#f2f3fa;font:16px Inter,system-ui,sans-serif;background:radial-gradient(ellipse at 18% 18%,rgba(108,108,245,.2),transparent 38%),radial-gradient(ellipse at 85% 82%,rgba(76,113,255,.1),transparent 35%),#101117}
+.login-layout{width:min(1040px,100%);display:grid;grid-template-columns:minmax(0,1.1fr) minmax(340px,.9fr);align-items:center;gap:clamp(40px,8vw,100px)}
+.intro{padding:20px 0}
+.brand{display:flex;align-items:center;gap:12px;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:20px;font-weight:700;letter-spacing:-.03em}
+.brand-mark{display:grid;width:42px;height:42px;place-items:center;border:1px solid rgba(143,145,255,.35);border-radius:14px;background:rgba(108,108,245,.16);color:#aaaaff;font-size:24px}
+.eyebrow{margin:40px 0 14px;color:#b2b3ff;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
+h1{max-width:600px;margin:0;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:clamp(38px,5vw,58px);line-height:1.04;letter-spacing:-.055em}
+.lead{max-width:510px;margin:20px 0 0;color:#b4b6c5;font-size:17px;line-height:1.7}
+.features{display:grid;gap:14px;margin:34px 0 0;padding:0;list-style:none}
+.features li{display:flex;align-items:center;gap:12px;color:#d8d9e5}
+.feature-icon{display:grid;width:34px;height:34px;flex:0 0 auto;place-items:center;border:1px solid #303343;border-radius:11px;background:#1b1d27;color:#a4a4ff;font-weight:700}
+.login-card{padding:clamp(25px,4vw,38px);border:1px solid rgba(142,145,171,.2);border-radius:22px;background:linear-gradient(155deg,rgba(31,33,45,.97),rgba(23,24,33,.97));box-shadow:0 28px 100px rgba(0,0,0,.38)}
+.card-kicker{margin:0 0 8px;color:#9d9eff;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+h2{margin:0;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:26px;letter-spacing:-.03em}
+.card-copy{margin:12px 0 22px;color:#aeb0bf;font-size:14px;line-height:1.65}
+.error{margin:0 0 18px;padding:12px 14px;border:1px solid rgba(242,84,91,.32);border-radius:12px;background:rgba(242,84,91,.1);color:#ffb1b5;font-size:14px;line-height:1.5}
+.discord-button,.install-app-btn{display:flex;width:100%;min-height:50px;align-items:center;justify-content:center;gap:10px;border-radius:12px;font:600 15px Inter,system-ui,sans-serif;text-decoration:none;transition:transform .16s ease,background .16s ease,border-color .16s ease}
+.discord-button{border:1px solid #6974ff;background:#5865f2;color:#fff;box-shadow:0 8px 24px rgba(88,101,242,.22)}
+.discord-button:hover{transform:translateY(-1px);background:#6875ff}
+.discord-icon{width:21px;height:21px;fill:currentColor}
+.install-app-btn{display:flex;margin:10px 0 0;border:1px solid #363949;background:#22242f;color:#e2e3ee}
+.install-app-btn:hover{border-color:#6e70c9;background:#292b38}
+.install-app-status{margin:10px 0 0;color:#bfc0d0;font-size:13px;line-height:1.5;text-align:center}
+.role-note{display:flex;gap:11px;margin:22px 0 0;padding:14px;border:1px solid #303343;border-radius:13px;background:rgba(13,14,20,.28)}
+.role-note-icon{color:#a5a6ff}
+.role-note strong{display:block;margin-bottom:3px;color:#e5e6f1;font-size:13px}
+.role-note span{display:block;color:#9fa1b2;font-size:12px;line-height:1.5}
+.privacy-note{margin:18px 0 0;color:#828493;font-size:11px;line-height:1.6;text-align:center}
+@media(max-width:760px){body{padding:max(24px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom))}.login-layout{max-width:460px;grid-template-columns:1fr;gap:25px}.intro{padding:0}.eyebrow{margin:23px 0 10px}h1{font-size:clamp(34px,10vw,46px)}.lead{margin-top:12px;font-size:15px;line-height:1.55}.features{grid-template-columns:1fr;gap:9px;margin-top:19px}.features li{font-size:13px}.feature-icon{width:30px;height:30px}.login-card{padding:23px;border-radius:19px}.card-copy{margin-bottom:18px}}
+@media(max-width:380px){body{padding-right:13px;padding-left:13px}.features{display:none}.login-card{padding:20px}}
+@media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
+</style></head><body><div class="login-layout">
+<section class="intro" aria-labelledby="welcome-title">
+<div class="brand"><span class="brand-mark" aria-hidden="true">◈</span><span>Panel Bot</span></div>
+<p class="eyebrow">Le contrôle de ton serveur, en un seul endroit</p>
+<h1 id="welcome-title">Ton serveur Discord, plus simple à gérer.</h1>
+<p class="lead">Un espace clair pour suivre ton bot et retrouver les outils essentiels sur ordinateur comme sur téléphone.</p>
+<ul class="features">
+<li><span class="feature-icon" aria-hidden="true">✓</span>Chat, membres et activité du serveur</li>
+<li><span class="feature-icon" aria-hidden="true">✓</span>Modération et réglages du bot</li>
+<li><span class="feature-icon" aria-hidden="true">✓</span>Interface adaptée au mobile</li>
+</ul>
+</section>
+<main class="login-card">
+<p class="card-kicker">Espace sécurisé</p><h2>Connecte-toi</h2>
+<p class="card-copy">Utilise Discord pour ouvrir ta session. Nous vérifions l’accès au serveur et au rôle autorisés avant d’afficher le panel.</p>
+${denied ? `<p class="error" role="alert">${denied}</p>` : ''}
+<a class="discord-button" href="/auth/discord"><svg class="discord-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.73 5.36A19.4 19.4 0 0 0 14.94 3.9l-.23.47a18 18 0 0 0-5.42 0l-.24-.47a19.3 19.3 0 0 0-4.78 1.46C1.24 9.02.42 12.6.83 16.14a19.5 19.5 0 0 0 5.86 2.96l1.27-2.06a12.7 12.7 0 0 1-2-.96l.49-.38a13.9 13.9 0 0 0 11.1 0l.5.38a12.8 12.8 0 0 1-2.02.96l1.27 2.06a19.4 19.4 0 0 0 5.86-2.96c.49-4.1-.83-7.64-3.43-10.78ZM8.54 14.5c-1.08 0-1.96-.99-1.96-2.2s.86-2.2 1.96-2.2 1.98.99 1.96 2.2c0 1.21-.86 2.2-1.96 2.2Zm6.92 0c-1.08 0-1.96-.99-1.96-2.2s.86-2.2 1.96-2.2 1.98.99 1.96 2.2c0 1.21-.86 2.2-1.96 2.2Z"/></svg>Continuer avec Discord</a>
+<button class="install-app-btn" id="install-app-btn" type="button">Installer l’application</button>
+<p class="install-app-status" id="install-app-status" role="status" aria-live="polite"></p>
+<div class="role-note"><span class="role-note-icon" aria-hidden="true">ⓘ</span><div><strong>Accès réservé</strong><span>Ton compte doit être membre du serveur autorisé et posséder le rôle requis.</span></div></div>
+<p class="privacy-note">La connexion passe par Discord. Ton mot de passe Discord n’est jamais demandé par ce site.</p>
+</main></div></body></html>`);
 });
 
 app.get('/auth/discord', (req, res) => {
@@ -426,7 +471,6 @@ app.get('/auth/discord', (req, res) => {
       redirect_uri: `${APP_URL}/auth/callback`,
       scope: 'identify guilds.members.read',
       state,
-      prompt: 'consent',
     });
     return res.redirect(authorization.toString());
   });
@@ -476,7 +520,8 @@ app.get('/auth/callback', async (req, res, next) => {
     await new Promise((resolve, reject) => req.session.save((err) => err ? reject(err) : resolve()));
     return res.redirect('/');
   } catch (oauthError) {
-    return next(oauthError);
+    console.error('Connexion OAuth Discord impossible :', oauthError);
+    return res.redirect('/login?denied=oauth');
   }
 });
 
