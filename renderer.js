@@ -1,5 +1,20 @@
 // ---------- Navigation ----------
 
+const mobileLogoMotion = window.matchMedia(
+  '(max-width: 760px) and (prefers-reduced-motion: no-preference)'
+);
+
+function playMobileLogoAnimation() {
+  const shell = document.querySelector('.shell');
+  if (!shell || !mobileLogoMotion.matches) return;
+
+  shell.classList.remove('mobile-logo-animate');
+  void shell.offsetWidth;
+  shell.classList.add('mobile-logo-animate');
+}
+
+window.addEventListener('pageshow', playMobileLogoAnimation);
+
 const navItems = document.querySelectorAll('.nav-item');
 const views = document.querySelectorAll('.view');
 if (window.location.protocol === 'file:') {
