@@ -609,6 +609,8 @@ function renderServerManagement() {
   protectedName.textContent = allowedGuild?.name || 'Serveur introuvable';
   status.textContent = !overview?.connected
     ? 'Bot hors ligne : connecte-le pour gérer ses serveurs.'
+    : !overview.canManage
+      ? `${overview.guilds.length} serveur(s) du bot. Affichage en lecture seule.`
     : allowedGuild
       ? `${overview.guilds.length} serveur(s) accessible(s) au bot.`
       : `Le bot ne voit pas le serveur à conserver (${overview?.allowedGuildId || 'ID inconnu'}). Aucun nettoyage ne sera effectué.`;
@@ -648,6 +650,7 @@ function renderServerManagement() {
 
   leaveButton.disabled = isLeavingOtherServers
     || !overview?.connected
+    || !overview?.canManage
     || !allowedGuild
     || !otherGuilds.length;
 }

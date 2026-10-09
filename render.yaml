@@ -9,7 +9,9 @@ services:
     envVars:
       - key: NODE_VERSION
         value: 22
-      - key: DISCORD_TOKEN
+      - key: BOT_SYNC_ONLY
+        value: true
+      - key: BOT_SYNC_SECRET
         sync: false
       - key: DISCORD_CLIENT_ID
         sync: false

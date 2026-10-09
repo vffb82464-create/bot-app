@@ -73,10 +73,59 @@ npm install
 1. Publie le dossier du projet sur un dépôt GitHub **sans `.env`, token, secret ni fichier `config.json`**.
 2. Dans [Discord Developer Portal](https://discord.com/developers/applications), ouvre la même application que le bot. Dans **OAuth2 > General**, ajoute l’URI de redirection fournie par Render sous la forme `https://TON-SERVICE.onrender.com/auth/callback`. Active **SERVER MEMBERS INTENT** et **MESSAGE CONTENT INTENT** dans **Bot**; active aussi **PRESENCE INTENT** pour afficher le nombre de membres en ligne.
 3. Sur Render, choisis **New > Blueprint**, connecte le dépôt et déploie `render.yaml`. Le service demande les valeurs secrètes manquantes.
-4. Dans **Environment** sur Render, renseigne `DISCORD_TOKEN`, `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` et `DISCORD_REDIRECT_URI` (l’URL exacte ajoutée au portail Discord). Garde la valeur générée de `SESSION_SECRET`.
+4. Dans **Environment** sur Render, renseigne `DISCORD_CLIENT_ID`, `DISCORD_CLIENT_SECRET` et `DISCORD_REDIRECT_URI` (l’URL exacte ajoutée au portail Discord). Garde la valeur générée de `SESSION_SECRET`. Pour afficher les serveurs d’un bot déjà hébergé ailleurs, le Blueprint utilise `BOT_SYNC_ONLY=true` et demande `BOT_SYNC_SECRET`.
 5. Attends le déploiement, ouvre l’adresse Render du service, puis connecte-toi avec le compte Discord auquel appartient le rôle `1540132253097664572` dans le serveur `1508431497433190420`.
 
 Le site refuse les comptes sans ce rôle et revérifie le rôle périodiquement ainsi qu’avant les actions. Le bot doit être membre du serveur autorisé et y disposer des permissions correspondant aux fonctions utilisées. Les clés restent dans **Environment** sur Render, jamais dans GitHub. Le service gratuit n’offre pas de disque persistant : ses journaux locaux peuvent être effacés lorsque Render redémarre ou redéploie le service. Pour conserver les journaux, configure un disque persistant Render et `DATA_DIR=/var/data`.
+
+### Bot déjà hébergé ailleurs : affichage des serveurs en lecture seule
+
+Le site Render ne doit pas démarrer une seconde connexion avec le token du bot. Crée une valeur secrète aléatoire d’au moins 32 caractères et ajoute-la sous `BOT_SYNC_SECRET` dans **Environment** sur Render et dans l’environnement du bot hébergé. Garde la même valeur privée des deux côtés. Dans le `index.js` du bot, ajoute après la création de `client` ce relais HTTPS :
+
+```js
+const PANEL_SYNC_URL = 'https://panel-bot-discord.onrender.com/api/bot-sync';
+
+async function syncPanelGuilds() {
+  const secret = process.env.BOT_SYNC_SECRET;
+  if (!secret) {
+    console.error('BOT_SYNC_SECRET manque : les serveurs ne seront pas envoyés au panel.');
+    return;
+  }
+
+  try {
+    const response = await fetch(PANEL_SYNC_URL, {
+      method: 'POST',
+      headers: {
+        authorization: `Bearer ${secret}`,
+        'content-type': 'application/json',
+      },
+      body: JSON.stringify({
+        connected: client.isReady(),
+        guilds: client.guilds.cache.map((guild) => ({
+          id: guild.id,
+          name: guild.name,
+          memberCount: guild.memberCount,
+        })),
+      }),
+    });
+    if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  } catch (error) {
+    console.error('Envoi de la liste des serveurs au panel impossible :', error.message);
+  }
+}
+
+client.on(Events.GuildCreate, () => { void syncPanelGuilds(); });
+client.on(Events.GuildDelete, () => { void syncPanelGuilds(); });
+```
+
+Dans le gestionnaire `client.once(Events.ClientReady, ...)`, ajoute à la fin :
+
+```js
+await syncPanelGuilds();
+setInterval(() => { void syncPanelGuilds(); }, 60_000).unref();
+```
+
+Redémarre ensuite le bot. L’onglet **Serveurs** affichera la liste actualisée en lecture seule; les commandes de gestion nécessitent que le panel soit relié au processus du bot.
 
 ## 6. Envoyer un message depuis le terminal
 

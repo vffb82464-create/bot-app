@@ -23,6 +23,8 @@ const CLIENT_ID = process.env.DISCORD_CLIENT_ID;
 const CLIENT_SECRET = process.env.DISCORD_CLIENT_SECRET;
 const SESSION_SECRET = process.env.SESSION_SECRET;
 const DISCORD_TOKEN = process.env.DISCORD_TOKEN;
+const BOT_SYNC_SECRET = process.env.BOT_SYNC_SECRET;
+const BOT_SYNC_ONLY = process.env.BOT_SYNC_ONLY === 'true';
 const GIPHY_API_KEY = process.env.GIPHY_API_KEY;
 const ALLOWED_GUILD_ID = '1508431497433190420';
 const ALLOWED_ROLE_ID = '1540132253097664572';
@@ -32,11 +34,14 @@ const CONFIG_PATH = path.join(DATA_PATH, 'config.json');
 const WARNINGS_PATH = path.join(DATA_PATH, 'warnings.json');
 const ACTIVITY_LOG_PATH = path.join(DATA_PATH, 'activity-logs.json');
 
-if (!DISCORD_TOKEN || !CLIENT_ID || !CLIENT_SECRET || !SESSION_SECRET || !APP_URL) {
+if ((!DISCORD_TOKEN && !BOT_SYNC_ONLY) || !CLIENT_ID || !CLIENT_SECRET || !SESSION_SECRET || !APP_URL) {
   throw new Error(
-    'Configure DISCORD_TOKEN, DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, '
+    'Configure DISCORD_TOKEN (unless BOT_SYNC_ONLY=true), DISCORD_CLIENT_ID, DISCORD_CLIENT_SECRET, '
     + 'DISCORD_REDIRECT_URI et SESSION_SECRET avant de démarrer le site.'
   );
+}
+if (BOT_SYNC_ONLY && (!BOT_SYNC_SECRET || BOT_SYNC_SECRET.length < 32)) {
+  throw new Error('BOT_SYNC_SECRET doit contenir au moins 32 caractères aléatoires.');
 }
 if (SESSION_SECRET.length < 32) {
   throw new Error('SESSION_SECRET doit contenir au moins 32 caractères aléatoires.');
@@ -54,7 +59,7 @@ app.use((req, res, next) => {
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   next();
 });
-app.use(express.json({ limit: '32kb' }));
+app.use(express.json({ limit: '128kb' }));
 app.use(session({
   name: 'panel.sid',
   secret: SESSION_SECRET,
@@ -101,6 +106,7 @@ let activeVoiceConnection = null;
 let audioPlayer = null;
 let currentMusic = { title: '', playing: false };
 let botLoginError = null;
+let remoteBotSnapshot = { connected: false, guilds: [], lastSeen: 0 };
 
 function loadJson(filePath, fallback) {
   try {
@@ -212,7 +218,47 @@ async function verifyRequiredRole(req, res, next) {
 }
 
 app.get('/health', (req, res) => {
-  res.json({ ok: true, botConnected: client.isReady() });
+  const remoteConnected = BOT_SYNC_ONLY
+    && remoteBotSnapshot.connected
+    && Date.now() - remoteBotSnapshot.lastSeen < 120000;
+  res.json({ ok: true, botConnected: BOT_SYNC_ONLY ? remoteConnected : client.isReady() });
+});
+
+app.post('/api/bot-sync', (req, res) => {
+  if (!BOT_SYNC_SECRET) return res.sendStatus(404);
+  const suppliedSecret = req.get('authorization')?.replace(/^Bearer\s+/i, '') || '';
+  const expected = Buffer.from(BOT_SYNC_SECRET);
+  const supplied = Buffer.from(suppliedSecret);
+  if (expected.length !== supplied.length || !crypto.timingSafeEqual(expected, supplied)) {
+    return res.sendStatus(401);
+  }
+
+  const { connected, guilds } = req.body || {};
+  if (typeof connected !== 'boolean' || !Array.isArray(guilds) || guilds.length > 500) {
+    return res.status(400).json({ error: 'Invalid bot snapshot.' });
+  }
+  const normalizedGuilds = [];
+  for (const guild of guilds) {
+    if (
+      !guild || typeof guild.id !== 'string' || !/^\d{17,20}$/.test(guild.id)
+      || typeof guild.name !== 'string' || guild.name.length > 100
+    ) {
+      return res.status(400).json({ error: 'Invalid guild entry.' });
+    }
+    normalizedGuilds.push({
+      id: guild.id,
+      name: guild.name,
+      memberCount: Number.isInteger(guild.memberCount) && guild.memberCount >= 0
+        ? guild.memberCount
+        : 0,
+    });
+  }
+  remoteBotSnapshot = {
+    connected,
+    guilds: normalizedGuilds,
+    lastSeen: Date.now(),
+  };
+  return res.sendStatus(204);
 });
 
 app.get('/login', (req, res) => {
@@ -652,8 +698,27 @@ async function executeCommand(name, args) {
     case 'getStats':
       return getStats(args[0]);
     case 'getServerOverview':
+      if (BOT_SYNC_ONLY) {
+        const connected = remoteBotSnapshot.connected
+          && Date.now() - remoteBotSnapshot.lastSeen < 120000;
+        return {
+          connected,
+          canManage: false,
+          allowedGuildId: ALLOWED_GUILD_ID,
+          allowedGuildName: remoteBotSnapshot.guilds.find((guild) => guild.id === ALLOWED_GUILD_ID)?.name || null,
+          guilds: connected
+            ? remoteBotSnapshot.guilds
+              .map((guild) => ({
+                ...guild,
+                allowed: guild.id === ALLOWED_GUILD_ID,
+              }))
+              .sort((left, right) => Number(right.allowed) - Number(left.allowed) || left.name.localeCompare(right.name))
+            : [],
+        };
+      }
       return {
         connected: client.isReady(),
+        canManage: client.isReady(),
         allowedGuildId: ALLOWED_GUILD_ID,
         allowedGuildName: client.guilds.cache.get(ALLOWED_GUILD_ID)?.name || null,
         guilds: client.guilds.cache
@@ -666,6 +731,7 @@ async function executeCommand(name, args) {
           .sort((left, right) => Number(right.allowed) - Number(left.allowed) || left.name.localeCompare(right.name)),
       };
     case 'leaveOtherServers': {
+      if (BOT_SYNC_ONLY) throw new Error('Le site est en lecture seule pour les serveurs du bot.');
       if (!client.isReady()) throw new Error('Le bot doit être connecté pour gérer ses serveurs.');
       if (!client.guilds.cache.has(ALLOWED_GUILD_ID)) {
         recordActivity('error', `Serveur autorisé ${ALLOWED_GUILD_ID} introuvable. Aucun serveur quitté.`);
@@ -950,11 +1016,13 @@ app.use((error, req, res, next) => {
 
 const server = app.listen(PORT, () => {
   console.log(`Panel Bot web server listening on port ${PORT}`);
-  client.login(DISCORD_TOKEN).catch((error) => {
-    botLoginError = error.message;
-    recordActivity('error', `Connexion du bot impossible : ${error.message}`);
-    broadcastBotStatus({ connected: false, error: error.message });
-  });
+  if (!BOT_SYNC_ONLY) {
+    client.login(DISCORD_TOKEN).catch((error) => {
+      botLoginError = error.message;
+      recordActivity('error', `Connexion du bot impossible : ${error.message}`);
+      broadcastBotStatus({ connected: false, error: error.message });
+    });
+  }
 });
 
 function shutdown() {
