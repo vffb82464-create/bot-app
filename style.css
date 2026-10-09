@@ -70,6 +70,28 @@ body {
   color: var(--accent);
 }
 
+.install-app-btn {
+  display: none;
+  margin-left: auto;
+  padding: 7px 10px;
+  border: 1px solid var(--border);
+  background: var(--panel-hi);
+  color: var(--text);
+  font-size: 12px;
+}
+
+.install-app-status {
+  display: none;
+  margin: 0 0 8px;
+  color: var(--text-dim);
+  font-size: 11px;
+  line-height: 1.4;
+}
+
+.install-app-status:not(:empty) {
+  display: block;
+}
+
 .session-user {
   display: flex;
   min-width: 0;
@@ -880,6 +902,59 @@ button {
   max-width: 100%;
 }
 
+.founder-bot-messages {
+  display: flex;
+  min-height: 180px;
+  max-height: 52vh;
+  flex-direction: column;
+  gap: 8px;
+  overflow-y: auto;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.founder-bot-message {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--panel);
+}
+
+.founder-bot-message.bot {
+  border-color: rgba(108, 108, 245, 0.35);
+}
+
+.founder-bot-message strong {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: var(--accent);
+}
+
+.founder-bot-message time {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.founder-bot-message p {
+  grid-column: 1 / -1;
+  margin: 0;
+  overflow-wrap: anywhere;
+  white-space: pre-wrap;
+}
+
+.founder-bot-composer {
+  margin-top: 12px;
+}
+
+.founder-bot-composer input {
+  min-width: 0;
+}
+
 /* ---------- Stats ---------- */
 
 .stat-grid {
@@ -934,9 +1009,14 @@ button {
   .brand {
     grid-area: brand;
     min-width: 0;
+    align-items: center;
     margin: 0;
     padding: 0 4px 8px;
     border: 0;
+  }
+
+  .install-app-btn {
+    display: inline-block;
   }
 
   .session-user {

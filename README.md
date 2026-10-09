@@ -86,6 +86,12 @@ Dans **Env** de hosting-bot.net, garde `BOT_SYNC_SECRET` identique à la valeur 
 
 Le relais prend en charge les salons, messages, membres, modération, réglages, vocal, musique, logs et serveurs, uniquement sur le serveur autorisé `1508431497433190420`. L’action qui fait quitter le bot des autres serveurs demande une confirmation dans le panel. Le compte connecté au panel doit avoir le rôle `1540132253097664572`.
 
+L’onglet **Fondateur** est visible uniquement pour le compte Discord `1264169087882231871` (qui doit également conserver le rôle requis du panel). Pour utiliser son second bot, définis la variable secrète `FOUNDER_BOT_TOKEN` dans l’environnement de hosting-bot.net, puis redémarre le bot. N’ajoute jamais ce token au panel, au dépôt GitHub, à un fichier `.env` publié ou à une conversation. Le second bot doit être invité dans le serveur autorisé et avoir **View Channel**, **Read Message History** et **Send Messages** dans les salons concernés. Active **MESSAGE CONTENT INTENT** dans les réglages du second bot sur Discord Developer Portal. La page affiche les messages récents et envoie les nouveaux messages comme ce bot; l’autre bot peut ignorer les messages provenant d’un bot selon son propre code.
+
+### Installer le panel sur un téléphone
+
+Le panel peut être ajouté à l’écran d’accueil depuis Chrome/Android ou Safari/iPhone. Sur Android, ouvre le site dans Chrome, connecte-toi, puis utilise le bouton **Installer** ou le menu Chrome **⋮ > Installer l’application**. Sur iPhone, ouvre le site dans Safari puis choisis **Partager > Sur l’écran d’accueil**. L’application nécessite une connexion Internet et ne met pas en cache les pages, les sessions ou les données du panel. N’installe pas le site tant que Chrome affiche un avertissement de sécurité : règle d’abord l’alerte auprès de Google.
+
 Le bloc ci-dessous est l’ancien relais de lecture seule : ne l’ajoute pas si tu utilises les deux fichiers complets mentionnés ci-dessus.
 
 ```js

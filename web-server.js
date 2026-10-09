@@ -28,6 +28,7 @@ const BOT_SYNC_ONLY = process.env.BOT_SYNC_ONLY === 'true';
 const GIPHY_API_KEY = process.env.GIPHY_API_KEY;
 const ALLOWED_GUILD_ID = '1508431497433190420';
 const ALLOWED_ROLE_ID = '1540132253097664572';
+const FOUNDER_USER_ID = '1264169087882231871';
 const MAX_ACTIVITY_LOGS = 200;
 const DATA_PATH = process.env.DATA_DIR || path.join(__dirname, 'data');
 const CONFIG_PATH = path.join(DATA_PATH, 'config.json');
@@ -114,6 +115,7 @@ let remoteBotSnapshot = {
   tag: null,
   voiceStatus: { connected: false },
   musicStatus: { title: '', playing: false },
+  founderBot: { configured: false, connected: false, username: '' },
   lastSeen: 0,
 };
 const pendingBotCommands = [];
@@ -191,6 +193,13 @@ function safeEqual(left, right) {
   const leftBuffer = Buffer.from(String(left));
   const rightBuffer = Buffer.from(String(right));
   return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
+}
+
+function requireFounder(req, res, next) {
+  if (req.session.discord?.id !== FOUNDER_USER_ID) {
+    return res.status(403).json({ error: 'Cette section est réservée au compte Fondateur.' });
+  }
+  return next();
 }
 
 async function verifyRequiredRole(req, res, next) {
@@ -319,6 +328,15 @@ function updateHostedBotSnapshot(snapshot) {
     musicStatus: snapshot.musicStatus && typeof snapshot.musicStatus === 'object'
       ? snapshot.musicStatus
       : remoteBotSnapshot.musicStatus,
+    founderBot: snapshot.founderBot && typeof snapshot.founderBot === 'object'
+      ? {
+        configured: snapshot.founderBot.configured === true,
+        connected: snapshot.founderBot.connected === true,
+        username: typeof snapshot.founderBot.username === 'string'
+          ? snapshot.founderBot.username.slice(0, 100)
+          : '',
+      }
+      : remoteBotSnapshot.founderBot,
     lastSeen: now,
   };
   if (Array.isArray(snapshot.events)) {
@@ -396,16 +414,21 @@ app.get('/login', (req, res) => {
       : '';
   res.type('html').send(`<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#121319"><link rel="manifest" href="/manifest.webmanifest">
+<link rel="apple-touch-icon" href="/icons/app-192.png"><script src="/pwa.js" defer></script>
 <title>Panel Bot — Connexion</title><style>
 *{box-sizing:border-box}body{margin:0;min-height:100vh;display:grid;place-items:center;background:#121319;color:#e7e7ea;font:16px Inter,system-ui,sans-serif}
 main{width:min(440px,calc(100% - 32px));padding:32px;border:1px solid #2a2d38;border-radius:16px;background:#1a1c24;text-align:center}
 h1{margin:0 0 10px;font-size:28px}p{color:#aeb0bb;line-height:1.6}.error{color:#f77b82}
 a{display:inline-block;margin-top:14px;padding:13px 20px;border-radius:8px;background:#5865f2;color:white;text-decoration:none;font-weight:700}
+button{display:block;margin:12px auto 0;padding:11px 18px;border:1px solid #414454;border-radius:8px;background:#20222c;color:#e7e7ea;font:inherit;font-weight:700}
 small{display:block;margin-top:20px;color:#8b8d98;line-height:1.5}
 </style></head><body><main><h1>◈ Panel Bot</h1>
 <p>Connecte-toi avec Discord. L’accès est réservé aux membres du serveur autorisé qui ont le rôle requis.</p>
 ${denied ? `<p class="error">${denied}</p>` : ''}
 <a href="/auth/discord">Continuer avec Discord</a>
+<button id="install-app-btn" type="button">Installer sur ce téléphone</button>
+<small id="install-app-status" role="status" aria-live="polite"></small>
 <small>Le site vérifie ton rôle Discord avant de donner accès au panel.</small></main></body></html>`);
 });
 
@@ -487,6 +510,34 @@ app.get('/', verifyRequiredRole, (req, res) => {
   res.sendFile(path.join(__dirname, 'index.html'));
 });
 
+app.get('/manifest.webmanifest', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.type('application/manifest+json').sendFile(path.join(__dirname, 'manifest.webmanifest'));
+});
+
+app.get('/service-worker.js', (req, res) => {
+  res.set({
+    'Cache-Control': 'no-cache, no-store, must-revalidate',
+    'Service-Worker-Allowed': '/',
+  });
+  res.type('application/javascript').sendFile(path.join(__dirname, 'service-worker.js'));
+});
+
+app.get('/pwa.js', (req, res) => {
+  res.set('Cache-Control', 'no-cache');
+  res.type('application/javascript').sendFile(path.join(__dirname, 'pwa.js'));
+});
+
+const appIcons = {
+  '/icons/app-192.png': path.join(__dirname, 'app-192.png'),
+  '/icons/app-512.png': path.join(__dirname, 'app-512.png'),
+};
+
+app.get(Object.keys(appIcons), (req, res) => {
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.type('image/png').sendFile(appIcons[req.path]);
+});
+
 app.get('/renderer.js', verifyRequiredRole, (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'renderer.js'));
 });
@@ -507,6 +558,7 @@ app.get('/api/session', verifyRequiredRole, (req, res) => {
       username: req.session.discord.username,
       avatar: req.session.discord.avatar,
     },
+    isFounder: req.session.discord.id === FOUNDER_USER_ID,
     csrfToken: req.session.csrfToken,
   });
 });
@@ -518,6 +570,59 @@ app.use('/api', verifyRequiredRole, (req, res, next) => {
     return res.status(403).json({ error: 'La vérification de sécurité a échoué. Recharge le site.' });
   }
   return next();
+});
+
+function requestHostedBotCommand(name, args) {
+  if (!BOT_SYNC_ONLY) throw new Error('Le relais vers le bot hébergé est désactivé.');
+  const connected = remoteBotSnapshot.connected && Date.now() - remoteBotSnapshot.lastSeen < 120000;
+  if (!connected) throw new Error('Le bot hébergé est hors ligne ou ne répond pas.');
+  if (pendingBotCommands.length >= 100) throw new Error('Trop de commandes sont en attente. Réessaie dans un instant.');
+
+  const requestId = crypto.randomUUID();
+  return new Promise((resolve, reject) => {
+    const timeout = setTimeout(() => {
+      waitingBotCommands.delete(requestId);
+      reject(new Error('Le bot ne répond pas à temps. Réessaie dans un instant.'));
+    }, 120000);
+    waitingBotCommands.set(requestId, { resolve, reject, timeout });
+    pendingBotCommands.push({ requestId, name, args });
+    deliverNextBotCommand();
+  });
+}
+
+app.get('/api/founder/bot/status', verifyFounder, (req, res) => {
+  const snapshotFresh = Date.now() - remoteBotSnapshot.lastSeen < 120000;
+  res.json({
+    configured: snapshotFresh && remoteBotSnapshot.founderBot.configured,
+    connected: snapshotFresh && remoteBotSnapshot.founderBot.connected,
+    username: snapshotFresh ? remoteBotSnapshot.founderBot.username : '',
+  });
+});
+
+app.get('/api/founder/bot/messages', verifyFounder, async (req, res) => {
+  const channelId = String(req.query.channelId || '');
+  if (!/^\d{17,20}$/.test(channelId)) return res.status(400).json({ error: 'Choisis un salon Discord valide.' });
+  try {
+    const messages = await requestHostedBotCommand('founderBotGetMessages', [{ channelId }]);
+    return res.json({ messages });
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
+});
+
+app.post('/api/founder/bot/messages', requireFounder, async (req, res) => {
+  const channelId = String(req.body?.channelId || '');
+  const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
+  if (!/^\d{17,20}$/.test(channelId)) return res.status(400).json({ error: 'Choisis un salon Discord valide.' });
+  if (!content || content.length > 2000) {
+    return res.status(400).json({ error: 'Le message doit contenir entre 1 et 2 000 caractères.' });
+  }
+  try {
+    await requestHostedBotCommand('founderBotSendMessage', [{ channelId, content }]);
+    return res.sendStatus(204);
+  } catch (error) {
+    return res.status(400).json({ error: error.message });
+  }
 });
 
 app.get('/api/events', verifyRequiredRole, (req, res) => {
@@ -1139,18 +1244,7 @@ app.post('/api/command', async (req, res) => {
   }
   try {
     if (BOT_SYNC_ONLY && name !== 'searchGifs' && name !== 'getServerOverview') {
-      const connected = remoteBotSnapshot.connected && Date.now() - remoteBotSnapshot.lastSeen < 120000;
-      if (!connected) throw new Error('Le bot hébergé est hors ligne ou ne répond pas. Vérifie hosting-bot.net.');
-      const requestId = crypto.randomUUID();
-      const result = await new Promise((resolve, reject) => {
-        const timeout = setTimeout(() => {
-          waitingBotCommands.delete(requestId);
-          reject(new Error('Le bot ne répond pas à temps. Réessaie dans un instant.'));
-        }, 120000);
-        waitingBotCommands.set(requestId, { resolve, reject, timeout });
-        pendingBotCommands.push({ requestId, name, args });
-        deliverNextBotCommand();
-      });
+      const result = await requestHostedBotCommand(name, args);
       return res.json({ result });
     }
     const result = await executeCommand(name, args);
