@@ -58,6 +58,18 @@ body {
   font-size: 20px;
 }
 
+.brand-mark svg {
+  width: 22px;
+  height: 22px;
+  overflow: visible;
+  fill: currentColor;
+  filter: drop-shadow(0 0 5px rgba(139, 140, 255, 0.4));
+}
+
+.brand-mark .brand-mark-core {
+  fill: #f2f2ff;
+}
+
 .brand-name {
   font-family: var(--font-head);
   font-weight: 600;
@@ -106,6 +118,61 @@ body {
 }
 
 .session-user[hidden] { display: none; }
+
+.server-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 12px;
+  padding: 12px 10px;
+  border: 1px solid rgba(108, 108, 245, 0.18);
+  border-radius: 11px;
+  background: linear-gradient(115deg, rgba(108, 108, 245, 0.11), rgba(108, 108, 245, 0.025));
+}
+
+.server-identity-icon {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  flex: 0 0 auto;
+  place-items: center;
+  border: 1px solid rgba(108, 108, 245, 0.23);
+  border-radius: 10px;
+  background: rgba(108, 108, 245, 0.14);
+  color: #a5a6ff;
+}
+
+.server-identity-icon svg {
+  width: 19px;
+  height: 19px;
+  fill: currentColor;
+}
+
+.server-identity-icon circle {
+  fill: var(--panel);
+}
+
+.server-identity-copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.server-identity-copy small {
+  color: var(--text-dim);
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+}
+
+.server-identity-copy strong {
+  overflow: hidden;
+  color: var(--text);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 
 .session-user img {
   width: 28px;
@@ -944,6 +1011,7 @@ button {
     grid-template-columns: minmax(0, 1fr) auto;
     grid-template-areas:
       "brand status"
+      "server server"
       "user user"
       "nav nav";
     gap: 0 8px;
@@ -1338,8 +1406,29 @@ a:focus-visible {
     height: 30px;
   }
 
+  .brand-mark svg {
+    width: 19px;
+    height: 19px;
+  }
+
   .brand-name {
     font-size: 16px;
+  }
+
+  .server-identity {
+    grid-area: server;
+    min-width: 0;
+    margin: 0 0 7px;
+    padding: 7px 9px;
+  }
+
+  .server-identity-icon {
+    width: 30px;
+    height: 30px;
+  }
+
+  .server-identity-copy strong {
+    font-size: 11px;
   }
 
   .nav {

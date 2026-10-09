@@ -27,6 +27,7 @@ const BOT_SYNC_SECRET = process.env.BOT_SYNC_SECRET;
 const BOT_SYNC_ONLY = process.env.BOT_SYNC_ONLY === 'true';
 const GIPHY_API_KEY = process.env.GIPHY_API_KEY;
 const ALLOWED_GUILD_ID = '1508431497433190420';
+const ALLOWED_GUILD_NAME = 'ZEFYXX COMMUNAUTÉ !';
 const ALLOWED_ROLE_ID = '1524502054423363787';
 const MAX_ACTIVITY_LOGS = 200;
 const DATA_PATH = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -399,8 +400,8 @@ app.get('/login', (req, res) => {
   res.type('html').send(`<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121319"><link rel="manifest" href="/manifest.webmanifest">
-<link rel="apple-touch-icon" href="/icons/app-192.png"><link rel="stylesheet" href="/style.css?v=access-redesign-1">
-<script src="/pwa.js?v=access-redesign-1" defer></script>
+<link rel="apple-touch-icon" href="/icons/panel-192.png"><link rel="stylesheet" href="/style.css?v=server-logo-2">
+<script src="/pwa.js?v=server-logo-2" defer></script>
 <title>Connexion Discord — Panel Bot</title><style>
 *{box-sizing:border-box}
 html{min-height:100%;background:#101117}
@@ -409,6 +410,9 @@ body{height:auto;min-height:100vh;min-height:100svh;overflow:auto;margin:0;displ
 .intro{padding:20px 0}
 .brand{display:flex;align-items:center;gap:12px;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:20px;font-weight:700;letter-spacing:-.03em}
 .brand-mark{display:grid;width:42px;height:42px;place-items:center;border:1px solid rgba(143,145,255,.35);border-radius:14px;background:rgba(108,108,245,.16);color:#aaaaff;font-size:24px}
+.brand-mark svg{width:24px;height:24px;fill:currentColor;filter:drop-shadow(0 0 6px rgba(143,145,255,.55))}
+.brand-mark .logo-eye{fill:#20222c}
+.brand-mark .logo-antenna{fill:#f3f3ff}
 .eyebrow{margin:40px 0 14px;color:#b2b3ff;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
 h1{max-width:600px;margin:0;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:clamp(38px,5vw,58px);line-height:1.04;letter-spacing:-.055em}
 .lead{max-width:510px;margin:20px 0 0;color:#b4b6c5;font-size:17px;line-height:1.7}
@@ -431,13 +435,20 @@ h2{margin:0;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:26p
 .role-note-icon{color:#a5a6ff}
 .role-note strong{display:block;margin-bottom:3px;color:#e5e6f1;font-size:13px}
 .role-note span{display:block;color:#9fa1b2;font-size:12px;line-height:1.5}
+.server-badge{display:flex;align-items:center;gap:12px;margin:21px 0;padding:13px;border:1px solid rgba(108,108,245,.2);border-radius:13px;background:linear-gradient(120deg,rgba(108,108,245,.12),rgba(108,108,245,.035))}
+.server-badge-icon{display:grid;width:38px;height:38px;flex:0 0 auto;place-items:center;border:1px solid rgba(108,108,245,.26);border-radius:11px;background:rgba(108,108,245,.16);color:#b1b2ff}
+.server-badge-icon svg{width:21px;height:21px;fill:currentColor}
+.server-badge-icon circle{fill:#20222c}
+.server-badge-copy{min-width:0}
+.server-badge-copy small{display:block;margin:0 0 4px;color:#9b9dac;font-size:10px;letter-spacing:.1em;text-transform:uppercase}
+.server-badge-copy strong{display:block;overflow-wrap:anywhere;color:#eff0fa;font-size:13px}
 .privacy-note{margin:18px 0 0;color:#828493;font-size:11px;line-height:1.6;text-align:center}
 @media(max-width:760px){body{padding:max(24px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom))}.login-layout{max-width:460px;grid-template-columns:1fr;gap:25px}.intro{padding:0}.eyebrow{margin:23px 0 10px}h1{font-size:clamp(34px,10vw,46px)}.lead{margin-top:12px;font-size:15px;line-height:1.55}.features{grid-template-columns:1fr;gap:9px;margin-top:19px}.features li{font-size:13px}.feature-icon{width:30px;height:30px}.login-card{padding:23px;border-radius:19px}.card-copy{margin-bottom:18px}}
 @media(max-width:380px){body{padding-right:13px;padding-left:13px}.features{display:none}.login-card{padding:20px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
 </style></head><body><div class="login-layout">
 <section class="intro" aria-labelledby="welcome-title">
-<div class="brand"><span class="brand-mark" aria-hidden="true">◈</span><span>Panel Bot</span></div>
+<div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40" focusable="false"><path d="M20 4.5v4M11 13a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v12a5 5 0 0 1-5 5h-2v3h-4v-3h-5v3h-4v-3h-1a5 5 0 0 1-5-5V18a5 5 0 0 1 5-5Z" transform="translate(2 0)"/><circle class="logo-eye" cx="16" cy="19" r="2"/><circle class="logo-eye" cx="25" cy="19" r="2"/><circle class="logo-antenna" cx="20" cy="4.5" r="2.2"/></svg></span><span>Panel Bot</span></div>
 <p class="eyebrow">Le contrôle de ton serveur, en un seul endroit</p>
 <h1 id="welcome-title">Ton serveur Discord, plus simple à gérer.</h1>
 <p class="lead">Un espace clair pour suivre ton bot et retrouver les outils essentiels sur ordinateur comme sur téléphone.</p>
@@ -446,6 +457,7 @@ h2{margin:0;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:26p
 <li><span class="feature-icon" aria-hidden="true">✓</span>Modération et réglages du bot</li>
 <li><span class="feature-icon" aria-hidden="true">✓</span>Interface adaptée au mobile</li>
 </ul>
+<div class="server-badge"><span class="server-badge-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v9a2.5 2.5 0 0 1-2.5 2.5h-5.9l-4.8 3.2c-.8.5-1.8 0-1.8-.9V17A2.5 2.5 0 0 1 4 14.5z"/><circle cx="9" cy="10" r="1.2"/><circle cx="15" cy="10" r="1.2"/></svg></span><span class="server-badge-copy"><small>Serveur Discord connecté au panel</small><strong>${ALLOWED_GUILD_NAME}</strong></span></div>
 </section>
 <main class="login-card">
 <p class="card-kicker">Espace sécurisé</p><h2>Connecte-toi</h2>
@@ -556,8 +568,8 @@ app.get('/pwa.js', (req, res) => {
 });
 
 const appIcons = {
-  '/icons/app-192.png': path.join(__dirname, 'app-192.png'),
-  '/icons/app-512.png': path.join(__dirname, 'app-512.png'),
+  '/icons/panel-192.png': path.join(__dirname, 'app-192.png'),
+  '/icons/panel-512.png': path.join(__dirname, 'app-512.png'),
 };
 
 app.get(Object.keys(appIcons), (req, res) => {
