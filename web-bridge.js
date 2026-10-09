@@ -38,8 +38,6 @@
             avatar.src = `https://cdn.discordapp.com/avatars/${data.user.id}/${data.user.avatar}.png?size=64`;
             avatar.hidden = false;
           }
-          const founderNav = document.getElementById('founder-nav-item');
-          if (founderNav) founderNav.hidden = data.isFounder !== true;
           startEventSource();
           return data;
         })
@@ -68,26 +66,6 @@
     }
     if (!response.ok) throw new Error(payload.error || 'La commande a échoué.');
     return payload.result;
-  }
-
-  async function founderRequest(path, options = {}) {
-    await getSession();
-    const headers = { ...(options.headers || {}) };
-    if (options.method === 'POST') {
-      headers['content-type'] = 'application/json';
-      headers['x-csrf-token'] = csrfToken;
-    }
-    const response = await fetch(path, {
-      ...options,
-      headers,
-      credentials: 'same-origin',
-    });
-    const payload = await response.json().catch(() => ({}));
-    if (response.status === 401) {
-      window.location.assign('/login?denied=role');
-    }
-    if (!response.ok) throw new Error(payload.error || 'Action Fondateur refusée.');
-    return payload;
   }
 
   function subscribe(eventName, callback) {
@@ -125,14 +103,6 @@
     getServerOverview: () => command('getServerOverview'),
     leaveOtherServers: () => command('leaveOtherServers'),
     getActivityLogs: () => command('getActivityLogs'),
-    getFounderBotStatus: () => founderRequest('/api/founder/bot/status'),
-    getFounderBotMessages: (channelId) => founderRequest(
-      `/api/founder/bot/messages?${new URLSearchParams({ channelId })}`
-    ),
-    sendFounderBotMessage: (data) => founderRequest('/api/founder/bot/messages', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
     onBotStatus: (callback) => subscribe('bot-status', callback),
     onVoiceStatus: (callback) => subscribe('voice-status', callback),
     onMusicStatus: (callback) => subscribe('music-status', callback),

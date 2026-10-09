@@ -38,11 +38,21 @@ if (installButton) {
     }
 
     if (!pendingInstallPrompt) {
-      const isAppleMobile = /iPhone|iPad|iPod/.test(navigator.userAgent);
+      const userAgent = navigator.userAgent;
+      const isAppleMobile = /iPhone|iPad|iPod/.test(userAgent)
+        || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
+      const isSamsungBrowser = /SamsungBrowser/i.test(userAgent);
+      const isAndroid = /Android/i.test(userAgent);
       if (installStatus) {
-        installStatus.textContent = isAppleMobile
-          ? 'Dans Safari, touche Partager puis « Sur l’écran d’accueil ».'
-          : 'Dans Chrome, ouvre ⋮ puis choisis « Installer l’application » ou « Ajouter à l’écran d’accueil ».';
+        if (isAppleMobile) {
+          installStatus.textContent = 'Dans Safari, touche Partager puis « Sur l’écran d’accueil ».';
+        } else if (isSamsungBrowser) {
+          installStatus.textContent = 'Dans Samsung Internet, ouvre le menu ☰ puis choisis « Ajouter une page à » et « Écran d’accueil ».';
+        } else if (isAndroid) {
+          installStatus.textContent = 'Dans le menu ⋮ de Chrome, touche « Installer l’application » ou « Ajouter à l’écran d’accueil ».';
+        } else {
+          installStatus.textContent = 'Ouvre le menu de ton navigateur et choisis « Installer » ou « Ajouter à l’écran d’accueil ».';
+        }
       }
       return;
     }
@@ -55,7 +65,7 @@ if (installButton) {
       if (installStatus) {
         installStatus.textContent = choice.outcome === 'accepted'
           ? 'Panel Bot est en cours d’installation.'
-          : 'Installation annulée. Tu peux la relancer depuis ce bouton.';
+          : 'Installation annulée. Tu peux la lancer depuis le menu de ton navigateur.';
       }
     } catch (error) {
       console.error('Échec de la demande d’installation :', error);

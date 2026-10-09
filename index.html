@@ -7,8 +7,8 @@
 <link rel="manifest" href="/manifest.webmanifest" />
 <link rel="apple-touch-icon" href="/icons/app-192.png" />
 <title>Panel Bot Discord</title>
-<link rel="stylesheet" href="style.css?v=founder-space-1" />
-<script src="/pwa.js" defer></script>
+<link rel="stylesheet" href="style.css?v=role-install-3" />
+<script src="/pwa.js?v=role-install-3" defer></script>
 </head>
 <body>
 
@@ -29,7 +29,6 @@
 
       <nav class="nav">
         <button class="nav-item active" data-view="chat">Chat</button>
-        <button class="nav-item" data-view="founder" id="founder-nav-item" hidden>Fondateur</button>
         <button class="nav-item" data-view="members">Membres</button>
         <button class="nav-item" data-view="bots">Bots</button>
         <button class="nav-item" data-view="voice">Vocal</button>
@@ -74,30 +73,6 @@
           <div class="gif-results" id="gif-results"></div>
           <p class="giphy-attribution">Powered by GIPHY</p>
         </section>
-      </section>
-
-      <section class="view" id="view-founder">
-        <header class="view-header">
-          <h1>Espace Fondateur</h1>
-          <p class="sub">Discussion du second bot dans un salon du serveur autorisé.</p>
-        </header>
-
-        <div class="panel wide-panel">
-          <h2>Second bot Discord</h2>
-          <p class="hint" id="founder-bot-status" role="status" aria-live="polite">Vérification du second bot…</p>
-          <p class="hint">Le token doit rester dans les variables secrètes de hosting-bot.net. Ne le colle jamais ici ni dans le chat.</p>
-          <label for="founder-bot-channel">Salon Discord</label>
-          <select id="founder-bot-channel" disabled>
-            <option value="">Configure d’abord le second bot</option>
-          </select>
-          <button class="btn-secondary" id="founder-bot-refresh" type="button" disabled>Actualiser les messages</button>
-          <p class="log" id="founder-bot-log" role="status" aria-live="polite"></p>
-          <div class="founder-bot-messages" id="founder-bot-messages" aria-live="polite"></div>
-          <form class="composer founder-bot-composer" id="founder-bot-composer">
-            <input type="text" id="founder-bot-message" maxlength="2000" placeholder="Message envoyé par le second bot…" autocomplete="off" disabled />
-            <button type="submit" id="founder-bot-send" disabled>Envoyer</button>
-          </form>
-        </div>
       </section>
 
       <!-- MEMBRES -->
@@ -364,6 +339,6 @@
   </div>
 
   <script src="web-bridge.js"></script>
-  <script src="renderer.js?v=founder-space-1"></script>
+  <script src="renderer.js?v=role-install-3"></script>
 </body>
 </html>

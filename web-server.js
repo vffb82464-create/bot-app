@@ -27,8 +27,7 @@ const BOT_SYNC_SECRET = process.env.BOT_SYNC_SECRET;
 const BOT_SYNC_ONLY = process.env.BOT_SYNC_ONLY === 'true';
 const GIPHY_API_KEY = process.env.GIPHY_API_KEY;
 const ALLOWED_GUILD_ID = '1508431497433190420';
-const ALLOWED_ROLE_ID = '1540132253097664572';
-const FOUNDER_USER_ID = '1264169087882231871';
+const ALLOWED_ROLE_ID = '1524502054423363787';
 const MAX_ACTIVITY_LOGS = 200;
 const DATA_PATH = process.env.DATA_DIR || path.join(__dirname, 'data');
 const CONFIG_PATH = path.join(DATA_PATH, 'config.json');
@@ -115,7 +114,6 @@ let remoteBotSnapshot = {
   tag: null,
   voiceStatus: { connected: false },
   musicStatus: { title: '', playing: false },
-  founderBot: { configured: false, connected: false, username: '' },
   lastSeen: 0,
 };
 const pendingBotCommands = [];
@@ -193,13 +191,6 @@ function safeEqual(left, right) {
   const leftBuffer = Buffer.from(String(left));
   const rightBuffer = Buffer.from(String(right));
   return leftBuffer.length === rightBuffer.length && crypto.timingSafeEqual(leftBuffer, rightBuffer);
-}
-
-function requireFounder(req, res, next) {
-  if (req.session.discord?.id !== FOUNDER_USER_ID) {
-    return res.status(403).json({ error: 'Cette section est réservée au compte Fondateur.' });
-  }
-  return next();
 }
 
 async function verifyRequiredRole(req, res, next) {
@@ -328,15 +319,6 @@ function updateHostedBotSnapshot(snapshot) {
     musicStatus: snapshot.musicStatus && typeof snapshot.musicStatus === 'object'
       ? snapshot.musicStatus
       : remoteBotSnapshot.musicStatus,
-    founderBot: snapshot.founderBot && typeof snapshot.founderBot === 'object'
-      ? {
-        configured: snapshot.founderBot.configured === true,
-        connected: snapshot.founderBot.connected === true,
-        username: typeof snapshot.founderBot.username === 'string'
-          ? snapshot.founderBot.username.slice(0, 100)
-          : '',
-      }
-      : remoteBotSnapshot.founderBot,
     lastSeen: now,
   };
   if (Array.isArray(snapshot.events)) {
@@ -558,7 +540,6 @@ app.get('/api/session', verifyRequiredRole, (req, res) => {
       username: req.session.discord.username,
       avatar: req.session.discord.avatar,
     },
-    isFounder: req.session.discord.id === FOUNDER_USER_ID,
     csrfToken: req.session.csrfToken,
   });
 });
@@ -589,41 +570,6 @@ function requestHostedBotCommand(name, args) {
     deliverNextBotCommand();
   });
 }
-
-app.get('/api/founder/bot/status', requireFounder, (req, res) => {
-  const snapshotFresh = Date.now() - remoteBotSnapshot.lastSeen < 120000;
-  res.json({
-    configured: snapshotFresh && remoteBotSnapshot.founderBot.configured,
-    connected: snapshotFresh && remoteBotSnapshot.founderBot.connected,
-    username: snapshotFresh ? remoteBotSnapshot.founderBot.username : '',
-  });
-});
-
-app.get('/api/founder/bot/messages', requireFounder, async (req, res) => {
-  const channelId = String(req.query.channelId || '');
-  if (!/^\d{17,20}$/.test(channelId)) return res.status(400).json({ error: 'Choisis un salon Discord valide.' });
-  try {
-    const messages = await requestHostedBotCommand('founderBotGetMessages', [{ channelId }]);
-    return res.json({ messages });
-  } catch (error) {
-    return res.status(400).json({ error: error.message });
-  }
-});
-
-app.post('/api/founder/bot/messages', requireFounder, async (req, res) => {
-  const channelId = String(req.body?.channelId || '');
-  const content = typeof req.body?.content === 'string' ? req.body.content.trim() : '';
-  if (!/^\d{17,20}$/.test(channelId)) return res.status(400).json({ error: 'Choisis un salon Discord valide.' });
-  if (!content || content.length > 2000) {
-    return res.status(400).json({ error: 'Le message doit contenir entre 1 et 2 000 caractères.' });
-  }
-  try {
-    await requestHostedBotCommand('founderBotSendMessage', [{ channelId, content }]);
-    return res.sendStatus(204);
-  } catch (error) {
-    return res.status(400).json({ error: error.message });
-  }
-});
 
 app.get('/api/events', verifyRequiredRole, (req, res) => {
   res.set({

@@ -36,10 +36,6 @@ function escapeHtml(value) {
 
 navItems.forEach((btn) => {
   btn.addEventListener('click', () => {
-    if (founderRefreshTimer) {
-      clearInterval(founderRefreshTimer);
-      founderRefreshTimer = null;
-    }
     navItems.forEach((b) => b.classList.remove('active'));
     views.forEach((v) => v.classList.remove('active'));
     btn.classList.add('active');
@@ -53,14 +49,6 @@ navItems.forEach((btn) => {
     if (btn.dataset.view === 'voice') loadVoiceChannels();
     if (btn.dataset.view === 'servers') loadServerManagement();
     if (btn.dataset.view === 'settings') loadSettings();
-    if (btn.dataset.view === 'founder') {
-      loadFounderBot();
-      founderRefreshTimer = setInterval(() => {
-        if (document.getElementById('view-founder').classList.contains('active')) {
-          loadFounderMessages();
-        }
-      }, 7000);
-    }
   });
 });
 
@@ -124,8 +112,6 @@ let mentionMembersGuildId = null;
 let activeMentionIndex = -1;
 let allBots = [];
 let selectedBotId = null;
-let founderRefreshTimer = null;
-let founderMessagesLoading = false;
 
 function updateReplyIndicator() {
   if (!replyTarget) {
@@ -469,123 +455,6 @@ composer.addEventListener('submit', async (e) => {
     updateReplyIndicator();
   } catch (err) {
     renderMessage({ author: 'Erreur', avatar: '', content: err.message });
-  }
-});
-
-const founderBotChannel = document.getElementById('founder-bot-channel');
-const founderBotStatus = document.getElementById('founder-bot-status');
-const founderBotMessages = document.getElementById('founder-bot-messages');
-const founderBotLog = document.getElementById('founder-bot-log');
-const founderBotComposer = document.getElementById('founder-bot-composer');
-const founderBotMessage = document.getElementById('founder-bot-message');
-const founderBotSendButton = document.getElementById('founder-bot-send');
-const founderBotRefreshButton = document.getElementById('founder-bot-refresh');
-const founderGuildId = '1508431497433190420';
-
-function setFounderBotControls(enabled) {
-  founderBotChannel.disabled = !enabled;
-  founderBotRefreshButton.disabled = !enabled || !founderBotChannel.value;
-  founderBotMessage.disabled = !enabled || !founderBotChannel.value;
-  founderBotSendButton.disabled = !enabled || !founderBotChannel.value;
-}
-
-async function loadFounderBot() {
-  founderBotStatus.textContent = 'Vérification de la connexion…';
-  founderBotLog.textContent = 'Vérification du second bot…';
-  founderBotMessages.replaceChildren();
-  setFounderBotControls(false);
-  try {
-    const status = await window.api.getFounderBotStatus();
-    if (!status.configured) {
-      founderBotStatus.textContent = 'Second bot non configuré.';
-      founderBotLog.textContent = 'Second bot non configuré. Ajoute FOUNDER_BOT_TOKEN dans les variables secrètes de hosting-bot.net, puis redémarre le bot hébergé.';
-      return;
-    }
-    if (!status.connected) {
-      founderBotStatus.textContent = 'Second bot hors ligne.';
-      founderBotLog.textContent = 'Second bot hors ligne. Vérifie son token, ses intents et le redémarrage sur hosting-bot.net.';
-      return;
-    }
-
-    founderBotStatus.textContent = `Connecté en tant que ${status.username}.`;
-    founderBotLog.textContent = `Connecté en tant que ${status.username}.`;
-    const channels = await window.api.getChannels(founderGuildId);
-    founderBotChannel.replaceChildren(
-      createOption('Choisis un salon Discord', ''),
-      ...channels.map((channel) => createOption(`#${channel.name}`, channel.id))
-    );
-    setFounderBotControls(true);
-    if (founderBotChannel.value) await loadFounderMessages();
-  } catch (error) {
-    founderBotStatus.textContent = 'État de connexion indisponible.';
-    founderBotLog.textContent = `Erreur : ${error.message}`;
-  }
-}
-
-async function loadFounderMessages() {
-  const channelId = founderBotChannel.value;
-  if (!channelId || founderMessagesLoading) return;
-  founderMessagesLoading = true;
-  founderBotRefreshButton.disabled = true;
-  try {
-    const { messages } = await window.api.getFounderBotMessages(channelId);
-    founderBotMessages.replaceChildren();
-    if (!messages.length) {
-      const empty = document.createElement('p');
-      empty.className = 'empty-hint';
-      empty.textContent = 'Aucun message récent dans ce salon.';
-      founderBotMessages.appendChild(empty);
-    }
-    messages.forEach((message) => {
-      const item = document.createElement('article');
-      item.className = `founder-bot-message${message.isBot ? ' bot' : ''}`;
-      const heading = document.createElement('strong');
-      heading.textContent = message.author;
-      const time = document.createElement('time');
-      time.dateTime = new Date(message.timestamp).toISOString();
-      time.textContent = new Date(message.timestamp).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-      });
-      const content = document.createElement('p');
-      content.textContent = message.content || '(message sans texte)';
-      item.append(heading, time, content);
-      founderBotMessages.appendChild(item);
-    });
-    founderBotMessages.scrollTop = founderBotMessages.scrollHeight;
-    founderBotLog.textContent = `${messages.length} message(s) récent(s). Actualisation automatique toutes les 7 secondes.`;
-  } catch (error) {
-    founderBotLog.textContent = `Erreur : ${error.message}`;
-  } finally {
-    founderMessagesLoading = false;
-    founderBotRefreshButton.disabled = !founderBotChannel.value;
-  }
-}
-
-founderBotChannel.addEventListener('change', () => {
-  setFounderBotControls(true);
-  founderBotMessages.replaceChildren();
-  loadFounderMessages();
-});
-
-founderBotRefreshButton.addEventListener('click', loadFounderMessages);
-
-founderBotComposer.addEventListener('submit', async (event) => {
-  event.preventDefault();
-  const content = founderBotMessage.value.trim();
-  const channelId = founderBotChannel.value;
-  if (!content || !channelId) return;
-
-  founderBotSendButton.disabled = true;
-  founderBotLog.textContent = 'Envoi du message…';
-  try {
-    await window.api.sendFounderBotMessage({ channelId, content });
-    founderBotMessage.value = '';
-    await loadFounderMessages();
-  } catch (error) {
-    founderBotLog.textContent = `Erreur : ${error.message}`;
-  } finally {
-    founderBotSendButton.disabled = !founderBotChannel.value;
   }
 });
 
