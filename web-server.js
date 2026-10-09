@@ -201,7 +201,7 @@ async function verifyRequiredRole(req, res, next) {
   }
 
   const checkedAt = req.session.discord.roleCheckedAt || 0;
-  if (Date.now() - checkedAt < 30000 && req.session.discord.hasRequiredRole) {
+  if (Date.now() - checkedAt < 5 * 60 * 1000 && req.session.discord.hasRequiredRole) {
     return next();
   }
 
