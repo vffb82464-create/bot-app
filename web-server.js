@@ -153,6 +153,7 @@ function configForUser() {
   return {
     ...config,
     guildId: ALLOWED_GUILD_ID,
+    readOnly: BOT_SYNC_ONLY,
   };
 }
 
@@ -674,6 +675,11 @@ async function executeCommand(name, args) {
       return configForUser();
     }
     case 'getGuilds': {
+      if (BOT_SYNC_ONLY) {
+        return remoteBotSnapshot.connected && Date.now() - remoteBotSnapshot.lastSeen < 120000
+          ? remoteBotSnapshot.guilds
+          : [];
+      }
       const guild = client.guilds.cache.get(ALLOWED_GUILD_ID);
       return guild ? [{ id: guild.id, name: guild.name }] : [];
     }

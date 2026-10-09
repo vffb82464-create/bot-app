@@ -125,7 +125,7 @@ await syncPanelGuilds();
 setInterval(() => { void syncPanelGuilds(); }, 60_000).unref();
 ```
 
-Redémarre ensuite le bot. L’onglet **Serveurs** affichera la liste actualisée en lecture seule; les commandes de gestion nécessitent que le panel soit relié au processus du bot.
+Redémarre ensuite le bot. L’onglet **Serveurs** et la liste **Serveur** dans Réglages afficheront les serveurs actualisés en lecture seule. Les sélecteurs de salons et l’enregistrement des réglages sont désactivés dans ce mode; les commandes de gestion nécessitent que le panel soit relié au processus du bot.
 
 ## 6. Envoyer un message depuis le terminal
 

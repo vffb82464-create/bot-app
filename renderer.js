@@ -459,13 +459,36 @@ async function loadSettings() {
   guildSelect.replaceChildren(...guilds.map((guild) => createOption(guild.name, guild.id)));
   if (config.guildId) guildSelect.value = config.guildId;
 
-  await populateChannels(guildSelect.value);
   const channelSelect = document.getElementById('channel-select');
   const welcomeChannelSelect = document.getElementById('welcome-channel-select');
+  const welcomeEnabled = document.getElementById('welcome-enabled');
+  const welcomeMessage = document.getElementById('welcome-message');
+  const saveButton = document.getElementById('save-settings-btn');
+  const modeNote = document.getElementById('settings-mode-note');
+  if (config.readOnly) {
+    channelSelect.replaceChildren(createOption('Les salons ne sont pas synchronisés', ''));
+    welcomeChannelSelect.replaceChildren(createOption('Les salons ne sont pas synchronisés', ''));
+    channelSelect.disabled = true;
+    welcomeChannelSelect.disabled = true;
+    welcomeEnabled.disabled = true;
+    welcomeMessage.disabled = true;
+    saveButton.disabled = true;
+    modeNote.hidden = false;
+    modeNote.textContent = 'Le bot est hébergé séparément : le serveur est affiché, mais ses réglages ne sont pas modifiables depuis ce site.';
+    return;
+  }
+
+  channelSelect.disabled = false;
+  welcomeChannelSelect.disabled = false;
+  welcomeEnabled.disabled = false;
+  welcomeMessage.disabled = false;
+  saveButton.disabled = false;
+  modeNote.hidden = true;
+  await populateChannels(guildSelect.value);
   if (config.channelId) channelSelect.value = config.channelId;
   if (config.welcomeChannelId) welcomeChannelSelect.value = config.welcomeChannelId;
-  document.getElementById('welcome-enabled').checked = Boolean(config.welcomeEnabled);
-  document.getElementById('welcome-message').value = config.welcomeMessage || 'Bienvenue {user} sur {server} ! 🎉';
+  welcomeEnabled.checked = Boolean(config.welcomeEnabled);
+  welcomeMessage.value = config.welcomeMessage || 'Bienvenue {user} sur {server} ! 🎉';
 
   guildSelect.onchange = () => populateChannels(guildSelect.value);
 }
