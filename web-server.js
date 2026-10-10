@@ -406,7 +406,7 @@ app.get('/login', (req, res) => {
   res.type('html').send(`<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121319"><link rel="manifest" href="/manifest.webmanifest">
-<link rel="icon" type="image/png" href="/icons/panel-192.png?v=2"><link rel="apple-touch-icon" href="/icons/panel-192.png?v=2"><link rel="stylesheet" href="/style.css?v=slash-commands-2">
+<link rel="icon" type="image/png" href="/icons/panel-192.png?v=2"><link rel="apple-touch-icon" href="/icons/panel-192.png?v=2"><link rel="stylesheet" href="/style.css?v=mobile-scroll-1">
 <script src="/pwa.js?v=slash-commands-2" defer></script>
 <title>Connexion Discord — Panel Bot</title><style>
 *{box-sizing:border-box}
@@ -452,6 +452,27 @@ h2{margin:0;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:26p
 @media(max-width:760px){body{padding:max(24px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom))}.login-layout{max-width:460px;grid-template-columns:1fr;gap:25px}.intro{padding:0}.eyebrow{margin:23px 0 10px}h1{font-size:clamp(34px,10vw,46px)}.lead{margin-top:12px;font-size:15px;line-height:1.55}.features{grid-template-columns:1fr;gap:9px;margin-top:19px}.features li{font-size:13px}.feature-icon{width:30px;height:30px}.login-card{padding:23px;border-radius:19px}.card-copy{margin-bottom:18px}}
 @media(max-width:380px){html,body{width:100%;min-width:0}body{padding-right:13px;padding-left:13px}.features{display:none}.login-card{padding:20px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
+.login-scroll-cue{display:none}
+@media(max-width:760px){
+html,body{min-width:0;overscroll-behavior-y:contain}
+body{display:block;padding:calc(24px + env(safe-area-inset-top)) 18px calc(28px + env(safe-area-inset-bottom));touch-action:pan-y}
+.login-layout{margin:0 auto;gap:18px}
+.intro{padding:0}
+.eyebrow{margin-top:24px}
+.features{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:18px}
+.features li{align-items:flex-start;gap:7px;font-size:11px;line-height:1.35}
+.feature-icon{width:24px;height:24px;border-radius:8px}
+.server-badge{margin:16px 0 0;padding:10px}
+.login-scroll-cue{display:flex;min-height:38px;align-items:center;justify-content:center;gap:8px;color:#aaaaff;font-size:12px;text-decoration:none}
+.login-scroll-cue span:last-child{font-size:18px;line-height:1}
+.login-card{padding:20px}
+.role-note{margin-top:16px;padding:11px}
+.privacy-note{margin-top:13px}
+}
+@media(max-width:380px){
+.features{display:grid}
+.features li{font-size:10px}
+}
 </style></head><body><div class="login-layout">
 <section class="intro" aria-labelledby="welcome-title">
 <div class="brand"><span class="brand-mark" aria-hidden="true"><img src="/panel-icon.svg?v=2" alt=""></span><span>Panel Bot</span></div>
@@ -465,7 +486,8 @@ h2{margin:0;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:26p
 </ul>
 <div class="server-badge"><span class="server-badge-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v9a2.5 2.5 0 0 1-2.5 2.5h-5.9l-4.8 3.2c-.8.5-1.8 0-1.8-.9V17A2.5 2.5 0 0 1 4 14.5z"/><circle cx="9" cy="10" r="1.2"/><circle cx="15" cy="10" r="1.2"/></svg></span><span class="server-badge-copy"><small>Serveur Discord connecté au panel</small><strong>${ALLOWED_GUILD_NAME}</strong></span></div>
 </section>
-<main class="login-card">
+<a class="login-scroll-cue" href="#login-panel" aria-label="Faire défiler jusqu’à la connexion"><span>Glisse vers le bas pour te connecter</span><span aria-hidden="true">↓</span></a>
+<main class="login-card" id="login-panel">
 <p class="card-kicker">Espace sécurisé</p><h2>Connecte-toi</h2>
 <p class="card-copy">Utilise Discord pour ouvrir ta session. Nous vérifions que tu es membre du serveur et que tu possèdes au moins un des quatre rôles autorisés.</p>
 ${denied ? `<p class="error" role="alert">${denied}</p>` : ''}
@@ -474,7 +496,20 @@ ${denied ? `<p class="error" role="alert">${denied}</p>` : ''}
 <p class="install-app-status" id="install-app-status" role="status" aria-live="polite"></p>
 <div class="role-note"><span class="role-note-icon" aria-hidden="true">ⓘ</span><div><strong>Accès réservé</strong><span>Ton compte doit être membre du serveur et avoir au moins un des quatre rôles autorisés.</span></div></div>
 <p class="privacy-note">La connexion passe par Discord. Ton mot de passe Discord n’est jamais demandé par ce site.</p>
-</main></div></body></html>`);
+</main></div><script>
+let loginTouchStart = null;
+document.addEventListener('touchstart', (event) => {
+  if (event.touches.length === 1) loginTouchStart = { y: event.touches[0].clientY, scrollY: window.scrollY };
+}, { passive: true });
+document.addEventListener('touchend', (event) => {
+  if (!loginTouchStart || !window.matchMedia('(max-width: 760px)').matches) return;
+  const delta = event.changedTouches[0].clientY - loginTouchStart.y;
+  if (delta > 55 && loginTouchStart.scrollY < 24) {
+    document.getElementById('login-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+  loginTouchStart = null;
+}, { passive: true });
+</script></body></html>`);
 });
 
 app.get('/auth/discord', (req, res) => {
