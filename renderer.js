@@ -213,6 +213,12 @@ const messagesEl = document.getElementById('messages');
 const composer = document.getElementById('composer');
 const messageInput = document.getElementById('message-input');
 const mentionSuggestions = document.getElementById('mention-suggestions');
+const emojiPicker = document.getElementById('emoji-picker');
+const emojiSearch = document.getElementById('emoji-search');
+const emojiPickerStatus = document.getElementById('emoji-picker-status');
+const emojiPickerGrid = document.getElementById('emoji-picker-grid');
+const toggleEmojiPicker = document.getElementById('toggle-emoji-picker');
+const toggleGifSearch = document.getElementById('toggle-gif-search');
 const replyIndicator = document.getElementById('reply-indicator');
 const replyTargetName = document.getElementById('reply-target-name');
 const gifTools = document.getElementById('gif-tools');
@@ -225,11 +231,145 @@ const botSearch = document.getElementById('bot-search');
 let currentChannelId = null;
 let replyTarget = null;
 let allMembers = [];
+let memberDirectoryMembers = null;
+let memberDirectoryGuildId = null;
+let memberDirectoryLoadPromise = null;
 let mentionMembersPromise = null;
 let mentionMembersGuildId = null;
 let activeMentionIndex = -1;
 let allBots = [];
 let selectedBotId = null;
+let guildEmojis = [];
+let guildEmojisLoaded = false;
+
+const commonEmojis = [
+  ['😀', 'sourire heureux'], ['😃', 'grand sourire'], ['😄', 'sourire yeux fermés'],
+  ['😁', 'grand sourire dents'], ['😆', 'rire'], ['😂', 'mort de rire'],
+  ['🤣', 'plié de rire'], ['😊', 'sourire content'], ['😇', 'ange'],
+  ['🙂', 'sourire'], ['😉', 'clin d’œil'], ['😍', 'yeux en cœur'],
+  ['🥰', 'visage amoureux'], ['😘', 'bisou'], ['😋', 'miam gourmand'],
+  ['😎', 'lunettes cool'], ['🤔', 'réflexion'], ['🤗', 'câlin'],
+  ['🤩', 'étoiles admiratif'], ['🥳', 'fête anniversaire'], ['😭', 'pleurer'],
+  ['😢', 'triste'], ['😡', 'colère'], ['🤯', 'explosion étonné'],
+  ['💀', 'crâne'], ['👋', 'salut main'], ['🤝', 'poignée de main'],
+  ['👏', 'applaudissements'], ['🙌', 'mains levées'], ['👍', 'pouce haut'],
+  ['👎', 'pouce bas'], ['❤️', 'cœur rouge'], ['🧡', 'cœur orange'],
+  ['💛', 'cœur jaune'], ['💚', 'cœur vert'], ['💙', 'cœur bleu'],
+  ['💜', 'cœur violet'], ['💔', 'cœur brisé'], ['🔥', 'feu'],
+  ['✨', 'étincelles'], ['⭐', 'étoile'], ['🎉', 'confettis fête'],
+  ['🎂', 'gâteau anniversaire'], ['✅', 'validation coche'], ['❌', 'croix'],
+  ['⚠️', 'attention'], ['💯', 'cent parfait'], ['🙏', 'merci prière'],
+  ['🤡', 'clown'], ['🐱', 'chat'], ['🐶', 'chien'], ['🍕', 'pizza'],
+  ['🍟', 'frites'], ['⚽', 'football'], ['🎮', 'jeu vidéo'],
+  ['🚀', 'fusée'], ['💎', 'diamant'],
+].map(([emoji, name]) => ({ emoji, name, custom: false }));
+
+function insertEmoji(value) {
+  const start = messageInput.selectionStart ?? messageInput.value.length;
+  const end = messageInput.selectionEnd ?? start;
+  messageInput.setRangeText(value, start, end, 'end');
+  messageInput.dispatchEvent(new Event('input', { bubbles: true }));
+  messageInput.focus();
+  emojiPicker.hidden = true;
+  toggleEmojiPicker.setAttribute('aria-expanded', 'false');
+}
+
+function renderEmojiPicker() {
+  const query = emojiSearch.value.trim().toLocaleLowerCase();
+  const matches = [
+    ...commonEmojis,
+    ...guildEmojis.map((emoji) => ({ ...emoji, custom: true })),
+  ].filter((emoji) => (
+    !query || `${emoji.name} ${emoji.emoji || ''} ${emoji.custom ? `:${emoji.name}:` : ''}`
+      .toLocaleLowerCase()
+      .includes(query)
+  ));
+
+  emojiPickerGrid.replaceChildren();
+  for (const emoji of matches) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'emoji-option';
+    button.setAttribute('aria-label', emoji.custom ? `:${emoji.name}:` : `${emoji.name} ${emoji.emoji}`);
+    button.title = emoji.custom ? `:${emoji.name}:` : emoji.name;
+    if (emoji.custom) {
+      const image = document.createElement('img');
+      image.src = emoji.url;
+      image.alt = '';
+      image.loading = 'lazy';
+      button.appendChild(image);
+    } else {
+      button.textContent = emoji.emoji;
+    }
+    button.addEventListener('click', () => {
+      insertEmoji(emoji.custom
+        ? `${emoji.animated ? '<a' : '<'}:${emoji.name}:${emoji.id}>`
+        : emoji.emoji);
+    });
+    emojiPickerGrid.appendChild(button);
+  }
+
+  if (!matches.length) {
+    emojiPickerStatus.textContent = 'Aucun emoji ne correspond à la recherche.';
+  } else if (emojiPickerStatus.dataset.loading === 'true') {
+    emojiPickerStatus.textContent = 'Chargement des emojis du serveur…';
+  } else if (!guildEmojisLoaded && emojiPickerStatus.dataset.error) {
+    emojiPickerStatus.textContent = `Emojis du serveur indisponibles : ${emojiPickerStatus.dataset.error}`;
+  } else {
+    emojiPickerStatus.textContent = guildEmojis.length
+      ? `${guildEmojis.length} emoji(s) du serveur · ${matches.length} résultat(s)`
+      : `Emojis courants · ${matches.length} résultat(s)`;
+  }
+}
+
+async function loadGuildEmojis() {
+  if (guildEmojisLoaded || emojiPickerStatus.dataset.loading === 'true') return;
+  emojiPickerStatus.dataset.loading = 'true';
+  delete emojiPickerStatus.dataset.error;
+  renderEmojiPicker();
+  try {
+    guildEmojis = await window.api.getGuildEmojis();
+    guildEmojisLoaded = true;
+  } catch (error) {
+    emojiPickerStatus.dataset.error = error.message;
+  } finally {
+    delete emojiPickerStatus.dataset.loading;
+    renderEmojiPicker();
+  }
+}
+
+toggleEmojiPicker.addEventListener('click', () => {
+  const isOpening = emojiPicker.hidden;
+  emojiPicker.hidden = !isOpening;
+  toggleEmojiPicker.setAttribute('aria-expanded', String(isOpening));
+  if (isOpening) {
+    gifTools.hidden = true;
+    toggleGifSearch.setAttribute('aria-expanded', 'false');
+    renderEmojiPicker();
+    loadGuildEmojis();
+    emojiSearch.focus();
+  }
+});
+
+emojiSearch.addEventListener('input', renderEmojiPicker);
+emojiSearch.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape') {
+    emojiPicker.hidden = true;
+    toggleEmojiPicker.setAttribute('aria-expanded', 'false');
+    toggleEmojiPicker.focus();
+  }
+});
+
+document.addEventListener('pointerdown', (event) => {
+  if (
+    !emojiPicker.hidden
+    && !emojiPicker.contains(event.target)
+    && !toggleEmojiPicker.contains(event.target)
+  ) {
+    emojiPicker.hidden = true;
+    toggleEmojiPicker.setAttribute('aria-expanded', 'false');
+  }
+});
 
 function updateReplyIndicator() {
   if (!replyTarget) {
@@ -451,11 +591,15 @@ messageInput.addEventListener('blur', () => {
   setTimeout(closeMentionSuggestions, 100);
 });
 
-document.getElementById('toggle-gif-search').addEventListener('click', (event) => {
+toggleGifSearch.addEventListener('click', (event) => {
   const isOpening = gifTools.hidden;
   gifTools.hidden = !isOpening;
   event.currentTarget.setAttribute('aria-expanded', String(isOpening));
-  if (isOpening) gifQuery.focus();
+  if (isOpening) {
+    emojiPicker.hidden = true;
+    toggleEmojiPicker.setAttribute('aria-expanded', 'false');
+    gifQuery.focus();
+  }
 });
 
 gifSearchForm.addEventListener('submit', async (event) => {
@@ -668,6 +812,11 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
       mentionMembersGuildId = null;
       mentionMembersPromise = null;
       allMembers = [];
+    }
+    if (memberDirectoryGuildId !== guildId) {
+      memberDirectoryGuildId = null;
+      memberDirectoryMembers = null;
+      memberDirectoryLoadPromise = null;
     }
     closeMentionSuggestions();
 
@@ -1004,22 +1153,50 @@ function renderMemberDirectory(members) {
     : '<p class="empty-hint">Aucun membre trouvé.</p>';
 }
 
+function setMemberDirectoryStatus(message) {
+  const container = document.getElementById('members-list');
+  const status = document.createElement('p');
+  status.className = 'empty-hint';
+  status.textContent = message;
+  container.replaceChildren(status);
+}
+
 async function loadMemberDirectory() {
-  const config = await window.api.getConfig();
-  if (!config.guildId) return;
-  const members = await window.api.getMembers(config.guildId);
-  renderMemberDirectory(members);
+  if (memberDirectoryMembers) {
+    renderMemberDirectory(memberDirectoryMembers);
+    return;
+  }
+  if (memberDirectoryLoadPromise) return memberDirectoryLoadPromise;
+
+  memberDirectoryLoadPromise = (async () => {
+    setMemberDirectoryStatus('Chargement des membres…');
+    const config = await window.api.getConfig();
+    if (!config.guildId) {
+      setMemberDirectoryStatus('Choisis d’abord un serveur dans Réglages.');
+      return;
+    }
+    memberDirectoryMembers = await window.api.getMembers(config.guildId);
+    memberDirectoryGuildId = config.guildId;
+    renderMemberDirectory(memberDirectoryMembers);
+  })()
+    .catch((error) => {
+      setMemberDirectoryStatus(`Impossible de charger les membres : ${error.message}`);
+    })
+    .finally(() => {
+      memberDirectoryLoadPromise = null;
+    });
+
+  return memberDirectoryLoadPromise;
 }
 
 memberSearch.addEventListener('input', () => {
   renderMemberList(allMembers);
 });
 
-document.getElementById('member-directory-search')?.addEventListener('input', async () => {
-  const config = await window.api.getConfig();
-  if (!config.guildId) return;
-  const members = await window.api.getMembers(config.guildId);
-  renderMemberDirectory(members);
+document.getElementById('member-directory-search')?.addEventListener('input', () => {
+  if (memberDirectoryMembers) {
+    renderMemberDirectory(memberDirectoryMembers);
+  }
 });
 
 async function loadBots() {

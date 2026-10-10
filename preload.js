@@ -13,6 +13,7 @@ contextBridge.exposeInMainWorld('api', {
   createSlashCommand: (data) => ipcRenderer.invoke('create-slash-command', data),
   deleteSlashCommand: (name) => ipcRenderer.invoke('delete-slash-command', name),
   getChannels: (guildId) => ipcRenderer.invoke('get-channels', guildId),
+  getGuildEmojis: () => ipcRenderer.invoke('get-guild-emojis'),
   getVoiceChannels: (guildId) => ipcRenderer.invoke('get-voice-channels', guildId),
   getMembers: (guildId) => ipcRenderer.invoke('get-members', guildId),
   getBots: (guildId) => ipcRenderer.invoke('get-bots', guildId),

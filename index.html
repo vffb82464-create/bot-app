@@ -72,8 +72,14 @@
         <div class="reply-indicator hidden" id="reply-indicator">Réponse à : <span id="reply-target-name"></span></div>
         <div class="composer-wrap">
           <div id="mention-suggestions" class="mention-suggestions" role="listbox" aria-label="Suggestions de membres" hidden></div>
+          <section id="emoji-picker" class="emoji-picker" aria-label="Sélecteur d’emojis" hidden>
+            <input id="emoji-search" type="text" maxlength="64" placeholder="Rechercher un emoji…" autocomplete="off" aria-label="Rechercher un emoji" />
+            <p id="emoji-picker-status" class="emoji-picker-status" role="status" aria-live="polite"></p>
+            <div id="emoji-picker-grid" class="emoji-picker-grid"></div>
+          </section>
           <form class="composer" id="composer">
             <input type="text" id="message-input" placeholder="Écris un message… il sera envoyé sur Discord" autocomplete="off" aria-autocomplete="list" aria-controls="mention-suggestions" />
+            <button type="button" id="toggle-emoji-picker" class="gif-toggle emoji-toggle" aria-expanded="false" aria-controls="emoji-picker" aria-label="Insérer un emoji">😊</button>
             <button type="button" id="toggle-gif-search" class="gif-toggle" aria-expanded="false" aria-controls="gif-tools">GIF</button>
             <button type="submit">Envoyer</button>
           </form>

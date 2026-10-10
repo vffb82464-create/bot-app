@@ -1,5 +1,7 @@
 node_modules/
 .env
 dist/
+icons/app.icns
+icons/app.iconset/
 activity-logs.json
 data/

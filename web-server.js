@@ -1015,6 +1015,18 @@ async function executeCommand(name, args) {
         .filter((channel) => channel?.isTextBased() && !channel.isThread())
         .map((channel) => ({ id: channel.id, name: channel.name }));
     }
+    case 'getGuildEmojis': {
+      const guild = requireAllowedGuild(ALLOWED_GUILD_ID);
+      const emojis = await guild.emojis.fetch();
+      return Array.from(emojis.values())
+        .filter((emoji) => emoji.available !== false)
+        .map((emoji) => ({
+          id: emoji.id,
+          name: emoji.name,
+          animated: emoji.animated,
+          url: emoji.imageURL({ extension: emoji.animated ? 'gif' : 'png', size: 32 }),
+        }));
+    }
     case 'getVoiceChannels': {
       const guild = requireAllowedGuild(args[0]);
       const channels = await guild.channels.fetch();
@@ -1317,7 +1329,7 @@ async function executeCommand(name, args) {
 }
 
 const allowedCommands = new Set([
-  'getConfig', 'saveConfig', 'getGuilds', 'getChannels', 'getVoiceChannels',
+  'getConfig', 'saveConfig', 'getGuilds', 'getChannels', 'getGuildEmojis', 'getVoiceChannels',
   'getMembers', 'getBots', 'getStats', 'getServerOverview', 'leaveOtherServers',
   'getActivityLogs', 'sendMessage', 'searchGifs', 'sendGif', 'sendAnnouncement',
   'getSlashCommands', 'createSlashCommand', 'deleteSlashCommand',

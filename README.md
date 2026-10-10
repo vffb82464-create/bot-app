@@ -42,6 +42,8 @@ Au premier lancement, va dans **Réglages** pour choisir le serveur et le salon 
 
 Dans le chat, tape `@` puis quelques lettres pour rechercher un membre du serveur. Choisis-le dans la liste avec la souris ou les flèches du clavier et Entrée : sa mention Discord est insérée dans le message.
 
+Le bouton 😊 du chat ouvre les emojis courants et ceux du serveur Discord. La recherche filtre les emojis et cliquer sur l’un d’eux l’insère à l’emplacement du curseur.
+
 La catégorie **Serveurs** affiche les serveurs où le bot se trouve. Le bouton **Quitter tous les autres serveurs** affiche une confirmation, puis retire le bot de tous les serveurs sauf `1508431497433190420`. Si le serveur à conserver n’est pas trouvé, aucun serveur ne sera quitté. Une nouvelle invitation sur un autre serveur sera aussi refusée automatiquement.
 
 La catégorie **Logs** conserve dans l’application les connexions, les départs de serveurs, les messages/annonces et les actions de modération. Les 200 entrées les plus récentes sont gardées dans les données locales de l’application.
@@ -50,10 +52,13 @@ Dans **Réglages > Accueil automatique**, active la fonctionnalité, choisis le 
 
 ## 4. Installer sur Mac (Intel et Apple Silicon)
 
-Pour créer les installateurs, utilise un Mac avec Node.js 18 ou plus récent :
+Les fichiers Mac sont compilés automatiquement sur GitHub Actions à chaque mise à jour de la branche `main`. Ouvre l’onglet **Actions**, sélectionne **Build macOS app**, puis télécharge l’artefact **Discord-Bot-App-macOS** du dernier succès. Il contient les installateurs `.dmg` et `.zip` Intel (`x64`) et Apple Silicon (`arm64`). La compilation peut aussi être lancée manuellement avec **Run workflow**.
+
+Pour créer les installateurs manuellement, utilise un Mac avec Node.js 18 ou plus récent. Génère d’abord l’icône macOS à partir de l’image du projet, puis lance la compilation :
 
 ```bash
 npm install
+npm run icon:mac
 npm run dist:mac
 ```
 
@@ -87,6 +92,8 @@ Pour contrôler le bot distant, remplace `index.js` par `C:\Users\bonjo\Desktop\
 Dans **Env** de hosting-bot.net, garde `BOT_SYNC_SECRET` identique à la valeur configurée dans **Environment** sur Render. Le bot ouvre une connexion HTTPS sortante vers Render : il n’est pas nécessaire d’ajouter un port entrant ni de démarrer un second bot sur Render. Après le remplacement des fichiers, redémarre le bot et vérifie les logs. Active aussi **SERVER MEMBERS INTENT** et **PRESENCE INTENT** dans le portail développeur Discord pour utiliser les membres et les statistiques de présence.
 
 Le relais prend en charge les salons, messages, membres, modération, réglages, vocal, musique, logs et serveurs, uniquement sur le serveur autorisé `1508431497433190420`. L’action qui fait quitter le bot des autres serveurs demande une confirmation dans le panel. Le compte connecté au panel doit posséder au moins un des rôles `1549853790742646856`, `1549293460345851922`, `1552764819222954006` ou `1524502220023005234`.
+
+Pour afficher les emojis personnalisés du serveur dans le sélecteur du panel, téléverse aussi la version à jour de `index-hosting-bot-panel-sync.js` et redémarre le bot hébergé.
 
 Dans **Commandes** du panel, tu peux créer des commandes slash personnalisées avec un nom, une description et une réponse en texte. Elles sont enregistrées directement sur le serveur Discord autorisé; les réponses sont publiques et les commandes peuvent être supprimées depuis la même page. Pour que cette fonction soit disponible, téléverse aussi la nouvelle version de `index-hosting-bot-panel-sync.js` sur hosting-bot.net et redémarre le bot après le déploiement Render.
 

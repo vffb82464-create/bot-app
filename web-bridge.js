@@ -81,6 +81,7 @@
     saveConfig: (config) => command('saveConfig', config),
     getGuilds: () => command('getGuilds'),
     getChannels: (guildId) => command('getChannels', guildId),
+    getGuildEmojis: () => command('getGuildEmojis'),
     getVoiceChannels: (guildId) => command('getVoiceChannels', guildId),
     getMembers: (guildId) => command('getMembers', guildId),
     getBots: (guildId) => command('getBots', guildId),

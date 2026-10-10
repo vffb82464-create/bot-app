@@ -595,6 +595,19 @@ ipcMain.handle('get-channels', async (event, guildId) => {
     .map((c) => ({ id: c.id, name: c.name }));
 });
 
+ipcMain.handle('get-guild-emojis', async () => {
+  const guild = await client.guilds.fetch(ALLOWED_GUILD_ID);
+  const emojis = await guild.emojis.fetch();
+  return Array.from(emojis.values())
+    .filter((emoji) => emoji.available !== false)
+    .map((emoji) => ({
+      id: emoji.id,
+      name: emoji.name,
+      animated: emoji.animated,
+      url: emoji.imageURL({ extension: emoji.animated ? 'gif' : 'png', size: 32 }),
+    }));
+});
+
 ipcMain.handle('get-voice-channels', async (event, guildId) => {
   const guild = await client.guilds.fetch(guildId);
   const channels = await guild.channels.fetch();
