@@ -28,7 +28,12 @@ const BOT_SYNC_ONLY = process.env.BOT_SYNC_ONLY === 'true';
 const GIPHY_API_KEY = process.env.GIPHY_API_KEY;
 const ALLOWED_GUILD_ID = '1508431497433190420';
 const ALLOWED_GUILD_NAME = 'ZEFYXX COMMUNAUTÉ !';
-const ALLOWED_ROLE_ID = '1524502054423363787';
+const ALLOWED_ROLE_IDS = new Set([
+  '1549853790742646856',
+  '1549293460345851922',
+  '1552764819222954006',
+  '1524502220023005234',
+]);
 const ROLE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_ACTIVITY_LOGS = 200;
 const DATA_PATH = process.env.DATA_DIR || path.join(__dirname, 'data');
@@ -210,11 +215,12 @@ async function verifyRequiredRole(req, res, next) {
       `https://discord.com/api/users/@me/guilds/${ALLOWED_GUILD_ID}/member`,
       { headers: { Authorization: `Bearer ${req.session.discord.accessToken}` } }
     );
-    const hasRequiredRole = Array.isArray(member.roles) && member.roles.includes(ALLOWED_ROLE_ID);
+    const hasRequiredRole = Array.isArray(member.roles)
+      && member.roles.some((roleId) => ALLOWED_ROLE_IDS.has(roleId));
     if (!hasRequiredRole) {
       req.session.destroy(() => {});
       if (!req.originalUrl.startsWith('/api/')) return res.redirect('/login?denied=role');
-      return res.status(403).json({ error: `Le rôle Discord requis (${ALLOWED_ROLE_ID}) est nécessaire.` });
+      return res.status(403).json({ error: 'Un des quatre rôles Discord autorisés est nécessaire.' });
     }
 
     req.session.discord.hasRequiredRole = true;
@@ -461,12 +467,12 @@ h2{margin:0;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:26p
 </section>
 <main class="login-card">
 <p class="card-kicker">Espace sécurisé</p><h2>Connecte-toi</h2>
-<p class="card-copy">Utilise Discord pour ouvrir ta session. Nous vérifions l’accès au serveur et au rôle autorisés avant d’afficher le panel.</p>
+<p class="card-copy">Utilise Discord pour ouvrir ta session. Nous vérifions que tu es membre du serveur et que tu possèdes au moins un des quatre rôles autorisés.</p>
 ${denied ? `<p class="error" role="alert">${denied}</p>` : ''}
 <a class="discord-button" href="/auth/discord"><svg class="discord-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.73 5.36A19.4 19.4 0 0 0 14.94 3.9l-.23.47a18 18 0 0 0-5.42 0l-.24-.47a19.3 19.3 0 0 0-4.78 1.46C1.24 9.02.42 12.6.83 16.14a19.5 19.5 0 0 0 5.86 2.96l1.27-2.06a12.7 12.7 0 0 1-2-.96l.49-.38a13.9 13.9 0 0 0 11.1 0l.5.38a12.8 12.8 0 0 1-2.02.96l1.27 2.06a19.4 19.4 0 0 0 5.86-2.96c.49-4.1-.83-7.64-3.43-10.78ZM8.54 14.5c-1.08 0-1.96-.99-1.96-2.2s.86-2.2 1.96-2.2 1.98.99 1.96 2.2c0 1.21-.86 2.2-1.96 2.2Zm6.92 0c-1.08 0-1.96-.99-1.96-2.2s.86-2.2 1.96-2.2 1.98.99 1.96 2.2c0 1.21-.86 2.2-1.96 2.2Z"/></svg>Continuer avec Discord</a>
 <button class="install-app-btn" id="install-app-btn" type="button">Installer l’application</button>
 <p class="install-app-status" id="install-app-status" role="status" aria-live="polite"></p>
-<div class="role-note"><span class="role-note-icon" aria-hidden="true">ⓘ</span><div><strong>Accès réservé</strong><span>Ton compte doit être membre du serveur autorisé et posséder le rôle requis.</span></div></div>
+<div class="role-note"><span class="role-note-icon" aria-hidden="true">ⓘ</span><div><strong>Accès réservé</strong><span>Ton compte doit être membre du serveur et avoir au moins un des quatre rôles autorisés.</span></div></div>
 <p class="privacy-note">La connexion passe par Discord. Ton mot de passe Discord n’est jamais demandé par ce site.</p>
 </main></div></body></html>`);
 });
