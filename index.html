@@ -5,10 +5,11 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#121319" />
 <link rel="manifest" href="/manifest.webmanifest" />
-<link rel="apple-touch-icon" href="/icons/panel-192.png" />
+<link rel="icon" type="image/png" href="/icons/panel-192.png?v=2" />
+<link rel="apple-touch-icon" href="/icons/panel-192.png?v=2" />
 <title>Panel Bot Discord</title>
-<link rel="stylesheet" href="style.css?v=robot-update-1" />
-<script src="/pwa.js?v=robot-update-1" defer></script>
+<link rel="stylesheet" href="style.css?v=slash-commands-2" />
+<script src="/pwa.js?v=slash-commands-2" defer></script>
 </head>
 <body>
 
@@ -16,12 +17,7 @@
     <aside class="sidebar">
       <div class="brand">
         <span class="brand-mark" aria-hidden="true">
-          <svg viewBox="0 0 40 40" focusable="false">
-            <path d="M20 4.5v4M11 13a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v12a5 5 0 0 1-5 5h-2v3h-4v-3h-5v3h-4v-3h-1a5 5 0 0 1-5-5V18a5 5 0 0 1 5-5Z" transform="translate(2 0)" />
-            <circle cx="16" cy="19" r="2" class="brand-mark-core" />
-            <circle cx="25" cy="19" r="2" class="brand-mark-core" />
-            <circle cx="20" cy="4.5" r="2.2" class="brand-mark-core" />
-          </svg>
+          <img src="panel-icon.svg?v=2" alt="" />
         </span>
         <span class="brand-name">panel<em>bot</em></span>
         <button class="install-app-btn" id="install-app-btn" type="button">Installer</button>
@@ -173,40 +169,29 @@
       <section class="view" id="view-commands">
         <header class="view-header">
           <h1>Commandes</h1>
-          <p class="sub">Raccourcis utiles pour agir vite</p>
+          <p class="sub">Crée des commandes slash personnalisées pour ton serveur Discord.</p>
         </header>
 
-        <div class="quick-grid">
-          <button class="quick-card quick-link" data-target="moderation">
-            <span>⚠️</span>
-            <strong>Modération</strong>
-            <small>Warn, mute, kick, ban</small>
-          </button>
-          <button class="quick-card quick-link" data-target="members">
-            <span>👥</span>
-            <strong>Membres</strong>
-            <small>Voir tous les IDs</small>
-          </button>
-          <button class="quick-card quick-link" data-target="bots">
-            <span>🤖</span>
-            <strong>Bots</strong>
-            <small>IDs et messages</small>
-          </button>
-          <button class="quick-card quick-link" data-target="stats">
-            <span>📊</span>
-            <strong>Statistiques</strong>
-            <small>Vue du serveur</small>
-          </button>
-          <button class="quick-card quick-link" data-target="settings">
-            <span>⚙️</span>
-            <strong>Réglages</strong>
-            <small>Serveur et salon</small>
-          </button>
-          <button class="quick-card" id="announce-quick-btn">
-            <span>📣</span>
-            <strong>Annonce</strong>
-            <small>Publier un message</small>
-          </button>
+        <div class="panel">
+          <h2>Nouvelle commande slash</h2>
+          <p class="hint">La commande sera disponible dans Discord sur le serveur autorisé. Le bot répondra avec le texte que tu définis.</p>
+          <form id="slash-command-form" class="slash-command-form">
+            <label for="slash-command-name">Nom de la commande</label>
+            <div class="slash-name-field"><span>/</span><input id="slash-command-name" name="name" type="text" maxlength="32" pattern="[a-z0-9_\x2d]{1,32}" placeholder="regles" required /></div>
+            <small class="hint">Minuscules, chiffres, tirets et tirets bas uniquement.</small>
+            <label for="slash-command-description">Description affichée dans Discord</label>
+            <input id="slash-command-description" name="description" type="text" maxlength="100" placeholder="Affiche les règles du serveur" required />
+            <label for="slash-command-response">Réponse du bot</label>
+            <textarea id="slash-command-response" name="response" rows="4" maxlength="2000" placeholder="Bienvenue ! Voici les règles du serveur…" required></textarea>
+            <button class="btn-primary" type="submit">Créer la commande</button>
+            <p class="slash-command-status" id="slash-command-status" role="status" aria-live="polite"></p>
+          </form>
+        </div>
+        <div class="panel">
+          <h2>Mes commandes</h2>
+          <div id="slash-command-list" class="slash-command-list" aria-live="polite">
+            <p class="empty-hint">Chargement des commandes…</p>
+          </div>
         </div>
       </section>
 
@@ -375,7 +360,7 @@
     <button class="btn-primary update-greeting-button" id="update-greeting-button" type="button">Bonjour !</button>
   </dialog>
 
-  <script src="web-bridge.js"></script>
-  <script src="renderer.js?v=robot-update-1"></script>
+  <script src="web-bridge.js?v=slash-commands-2"></script>
+  <script src="renderer.js?v=slash-commands-2"></script>
 </body>
 </html>

@@ -29,6 +29,7 @@ const GIPHY_API_KEY = process.env.GIPHY_API_KEY;
 const ALLOWED_GUILD_ID = '1508431497433190420';
 const ALLOWED_GUILD_NAME = 'ZEFYXX COMMUNAUTÉ !';
 const ALLOWED_ROLE_ID = '1524502054423363787';
+const ROLE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_ACTIVITY_LOGS = 200;
 const DATA_PATH = process.env.DATA_DIR || path.join(__dirname, 'data');
 const CONFIG_PATH = path.join(DATA_PATH, 'config.json');
@@ -201,7 +202,7 @@ async function verifyRequiredRole(req, res, next) {
   }
 
   const checkedAt = req.session.discord.roleCheckedAt || 0;
-  if (Date.now() - checkedAt < 5 * 60 * 1000 && req.session.discord.hasRequiredRole) {
+  if (Date.now() - checkedAt < ROLE_CHECK_INTERVAL_MS && req.session.discord.hasRequiredRole) {
     return next();
   }
 
@@ -400,8 +401,8 @@ app.get('/login', (req, res) => {
   res.type('html').send(`<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121319"><link rel="manifest" href="/manifest.webmanifest">
-<link rel="apple-touch-icon" href="/icons/panel-192.png"><link rel="stylesheet" href="/style.css?v=server-logo-2">
-<script src="/pwa.js?v=server-logo-2" defer></script>
+<link rel="icon" type="image/png" href="/icons/panel-192.png?v=2"><link rel="apple-touch-icon" href="/icons/panel-192.png?v=2"><link rel="stylesheet" href="/style.css?v=slash-commands-2">
+<script src="/pwa.js?v=slash-commands-2" defer></script>
 <title>Connexion Discord — Panel Bot</title><style>
 *{box-sizing:border-box}
 html{min-height:100%;background:#101117}
@@ -410,7 +411,7 @@ body{height:auto;min-height:100vh;min-height:100svh;overflow:auto;margin:0;displ
 .intro{padding:20px 0}
 .brand{display:flex;align-items:center;gap:12px;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:20px;font-weight:700;letter-spacing:-.03em}
 .brand-mark{display:grid;width:42px;height:42px;place-items:center;border:1px solid rgba(143,145,255,.35);border-radius:14px;background:rgba(108,108,245,.16);color:#aaaaff;font-size:24px}
-.brand-mark svg{width:24px;height:24px;fill:currentColor;filter:drop-shadow(0 0 6px rgba(143,145,255,.55))}
+.brand-mark img{width:42px;height:42px;object-fit:contain}
 .brand-mark .logo-eye{fill:#20222c}
 .brand-mark .logo-antenna{fill:#f3f3ff}
 .eyebrow{margin:40px 0 14px;color:#b2b3ff;font-size:12px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
@@ -448,7 +449,7 @@ h2{margin:0;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:26p
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
 </style></head><body><div class="login-layout">
 <section class="intro" aria-labelledby="welcome-title">
-<div class="brand"><span class="brand-mark" aria-hidden="true"><svg viewBox="0 0 40 40" focusable="false"><path d="M20 4.5v4M11 13a5 5 0 0 1 5-5h8a5 5 0 0 1 5 5v12a5 5 0 0 1-5 5h-2v3h-4v-3h-5v3h-4v-3h-1a5 5 0 0 1-5-5V18a5 5 0 0 1 5-5Z" transform="translate(2 0)"/><circle class="logo-eye" cx="16" cy="19" r="2"/><circle class="logo-eye" cx="25" cy="19" r="2"/><circle class="logo-antenna" cx="20" cy="4.5" r="2.2"/></svg></span><span>Panel Bot</span></div>
+<div class="brand"><span class="brand-mark" aria-hidden="true"><img src="/panel-icon.svg?v=2" alt=""></span><span>Panel Bot</span></div>
 <p class="eyebrow">Le contrôle de ton serveur, en un seul endroit</p>
 <h1 id="welcome-title">Ton serveur Discord, plus simple à gérer.</h1>
 <p class="lead">Un espace clair pour suivre ton bot et retrouver les outils essentiels sur ordinateur comme sur téléphone.</p>
@@ -577,6 +578,11 @@ app.get(Object.keys(appIcons), (req, res) => {
   res.type('image/png').sendFile(appIcons[req.path]);
 });
 
+app.get('/panel-icon.svg', (req, res) => {
+  res.set('Cache-Control', 'public, max-age=86400');
+  res.type('image/svg+xml').sendFile(path.join(__dirname, 'panel-icon.svg'));
+});
+
 app.get('/renderer.js', verifyRequiredRole, (req, res) => {
   res.type('application/javascript').sendFile(path.join(__dirname, 'renderer.js'));
 });
@@ -662,7 +668,7 @@ app.get('/api/events', verifyRequiredRole, (req, res) => {
   }
   events.add(res);
   const heartbeat = setInterval(() => {
-    if (Date.now() - (req.session.discord?.roleCheckedAt || 0) >= 30000) {
+    if (Date.now() - (req.session.discord?.roleCheckedAt || 0) >= ROLE_CHECK_INTERVAL_MS) {
       clearInterval(heartbeat);
       events.delete(res);
       res.end();
@@ -1241,6 +1247,7 @@ const allowedCommands = new Set([
   'getConfig', 'saveConfig', 'getGuilds', 'getChannels', 'getVoiceChannels',
   'getMembers', 'getBots', 'getStats', 'getServerOverview', 'leaveOtherServers',
   'getActivityLogs', 'sendMessage', 'searchGifs', 'sendGif', 'sendAnnouncement',
+  'getSlashCommands', 'createSlashCommand', 'deleteSlashCommand',
   'kickMember', 'banMember', 'timeoutMember', 'warnMember', 'setBotStatus',
   'joinVoice', 'leaveVoice', 'disconnectVoice', 'playMusic', 'pauseMusic',
   'resumeMusic', 'stopMusic',

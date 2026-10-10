@@ -66,6 +66,13 @@ body {
   filter: drop-shadow(0 0 5px rgba(139, 140, 255, 0.4));
 }
 
+.brand-mark img {
+  display: block;
+  width: 36px;
+  height: 36px;
+  object-fit: contain;
+}
+
 .brand-mark .brand-mark-core {
   fill: #f2f2ff;
 }
@@ -632,6 +639,104 @@ button {
 .panel textarea { margin-top: 8px; resize: vertical; }
 .panel input, .panel select { margin-top: 8px; }
 .panel .btn-primary { margin-top: 14px; }
+
+.slash-command-form {
+  display: grid;
+  gap: 8px;
+}
+
+.slash-command-form label {
+  margin-top: 10px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.slash-name-field {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-left: 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+  color: var(--accent);
+  font-weight: 700;
+}
+
+.slash-name-field:focus-within {
+  border-color: var(--accent);
+}
+
+.slash-name-field input {
+  width: 100%;
+  margin: 0;
+  border: 0;
+  background: transparent;
+}
+
+.slash-name-field input:focus {
+  outline: 0;
+}
+
+.slash-command-form .hint {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.slash-command-status {
+  min-height: 20px;
+  margin: 4px 0 0;
+  color: var(--success);
+  font-size: 13px;
+}
+
+.slash-command-status.is-error {
+  color: var(--danger);
+}
+
+.slash-command-list {
+  display: grid;
+  gap: 10px;
+}
+
+.slash-command-row {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--panel-hi);
+}
+
+.slash-command-copy {
+  min-width: 0;
+}
+
+.slash-command-copy strong {
+  color: #b5b5ff;
+}
+
+.slash-command-copy p {
+  margin: 5px 0;
+  color: var(--text);
+  font-size: 13px;
+}
+
+.slash-command-copy small {
+  display: block;
+  overflow-wrap: anywhere;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.slash-command-delete {
+  flex: 0 0 auto;
+}
+
 #member-search {
   margin-bottom: 8px;
 }

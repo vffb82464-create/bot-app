@@ -10,7 +10,14 @@ if (app.isPackaged && !fs.existsSync(ENV_PATH)) {
   fs.copyFileSync(path.join(process.resourcesPath, '.env.example'), ENV_PATH);
 }
 require('dotenv').config({ path: ENV_PATH });
-const { Client, GatewayIntentBits, EmbedBuilder, ActivityType } = require('discord.js');
+const {
+  Client,
+  GatewayIntentBits,
+  EmbedBuilder,
+  ActivityType,
+  REST,
+  Routes,
+} = require('discord.js');
 const {
   joinVoiceChannel,
   getVoiceConnection,
@@ -32,6 +39,7 @@ if (ffmpegPath) {
 const CONFIG_PATH = path.join(DATA_PATH, 'config.json');
 const WARNINGS_PATH = path.join(DATA_PATH, 'warnings.json');
 const ACTIVITY_LOG_PATH = path.join(DATA_PATH, 'activity-logs.json');
+const SLASH_COMMANDS_PATH = path.join(DATA_PATH, 'slash-commands.json');
 const ALLOWED_GUILD_ID = '1508431497433190420';
 const MAX_ACTIVITY_LOGS = 200;
 const DEFAULT_CONFIG = {
@@ -88,9 +96,34 @@ function saveWarnings(warnings) {
   fs.writeFileSync(WARNINGS_PATH, JSON.stringify(warnings, null, 2));
 }
 
+function loadSlashCommands() {
+  try {
+    const commands = JSON.parse(fs.readFileSync(SLASH_COMMANDS_PATH, 'utf-8'));
+    if (!Array.isArray(commands)) throw new Error('Le fichier des commandes slash doit contenir une liste.');
+    if (commands.some((command) =>
+      !command
+      || typeof command.name !== 'string'
+      || typeof command.description !== 'string'
+      || typeof command.response !== 'string'
+      || typeof command.commandId !== 'string'
+    )) {
+      throw new Error('Le fichier des commandes slash contient une entrée invalide.');
+    }
+    return commands;
+  } catch (error) {
+    if (error.code === 'ENOENT') return [];
+    throw error;
+  }
+}
+
+function saveSlashCommands(commands) {
+  fs.writeFileSync(SLASH_COMMANDS_PATH, JSON.stringify(commands, null, 2));
+}
+
 let mainWindow;
 let config = loadConfig();
 let activityLogs = loadActivityLogs();
+let slashCommands = loadSlashCommands();
 const memberCache = new Map();
 const botCache = new Map();
 const statsCache = new Map();
@@ -241,6 +274,28 @@ client.on('error', (err) => {
   mainWindow?.webContents.send('bot-status', { connected: false, error: err.message });
 });
 
+client.on('interactionCreate', async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+  const command = slashCommands.find((entry) => entry.name === interaction.commandName);
+  if (!command) return;
+
+  try {
+    if (interaction.guildId !== ALLOWED_GUILD_ID) {
+      await interaction.reply({
+        content: 'Cette commande est réservée au serveur autorisé.',
+        ephemeral: true,
+      });
+      return;
+    }
+    await interaction.reply({
+      content: command.response,
+      allowedMentions: { parse: [] },
+    });
+  } catch (error) {
+    recordActivity('error', `Impossible de répondre avec /${command.name} : ${error.message}`);
+  }
+});
+
 client.on('messageCreate', (message) => {
   if (message.author.bot) {
     if (config.guildId && message.guildId === config.guildId) {
@@ -307,6 +362,7 @@ function createWindow() {
     minWidth: 820,
     minHeight: 560,
     backgroundColor: '#15161c',
+    icon: path.join(__dirname, 'app-512.png'),
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       contextIsolation: true,
@@ -386,6 +442,103 @@ ipcMain.handle('leave-other-servers', async () => {
 });
 
 ipcMain.handle('get-activity-logs', () => activityLogs);
+ipcMain.handle('get-slash-commands', () => (
+  slashCommands.map(({ name, description, response }) => ({ name, description, response }))
+));
+
+ipcMain.handle('create-slash-command', async (event, input = {}) => {
+  const name = typeof input.name === 'string' ? input.name.trim() : '';
+  const description = typeof input.description === 'string' ? input.description.trim() : '';
+  const response = typeof input.response === 'string' ? input.response.trim() : '';
+  if (!/^[a-z0-9_-]{1,32}$/.test(name)) {
+    throw new Error('Le nom doit contenir 1 à 32 caractères minuscules, chiffres, tirets ou tirets bas.');
+  }
+  if (!description || description.length > 100) {
+    throw new Error('La description doit contenir entre 1 et 100 caractères.');
+  }
+  if (!response || response.length > 2000) {
+    throw new Error('La réponse doit contenir entre 1 et 2 000 caractères.');
+  }
+  if (!client.isReady() || !client.user) {
+    throw new Error('Le bot doit être connecté pour gérer les commandes slash.');
+  }
+  if (slashCommands.some((command) => command.name === name)) {
+    throw new Error(`La commande /${name} existe déjà.`);
+  }
+
+  const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+  const route = Routes.applicationGuildCommands(client.user.id, ALLOWED_GUILD_ID);
+  const registeredCommands = await rest.get(route);
+  if (registeredCommands.some((command) => command.name === name)) {
+    throw new Error(`Le nom /${name} est déjà utilisé par une commande Discord.`);
+  }
+  if (registeredCommands.length >= 100) {
+    throw new Error('Discord limite à 100 le nombre de commandes sur ce serveur.');
+  }
+
+  const registered = await rest.post(route, {
+    body: { name, description, type: 1 },
+  });
+  const updatedCommands = [...slashCommands, {
+    commandId: registered.id,
+    name,
+    description,
+    response,
+  }];
+  try {
+    saveSlashCommands(updatedCommands);
+  } catch (error) {
+    try {
+      await rest.delete(Routes.applicationGuildCommand(client.user.id, ALLOWED_GUILD_ID, registered.id));
+    } catch (rollbackError) {
+      throw new AggregateError(
+        [error, rollbackError],
+        `L’enregistrement de /${name} a échoué et Discord n’a pas pu annuler la commande créée.`
+      );
+    }
+    throw error;
+  }
+  slashCommands = updatedCommands;
+  recordActivity('info', `Commande slash /${name} créée.`, { guildId: ALLOWED_GUILD_ID });
+  return { name, description, response };
+});
+
+ipcMain.handle('delete-slash-command', async (event, name) => {
+  if (typeof name !== 'string') throw new Error('Nom de commande invalide.');
+  if (!client.isReady() || !client.user) {
+    throw new Error('Le bot doit être connecté pour gérer les commandes slash.');
+  }
+  const command = slashCommands.find((entry) => entry.name === name);
+  if (!command) throw new Error(`La commande /${name} est introuvable.`);
+
+  const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+  const route = Routes.applicationGuildCommand(client.user.id, ALLOWED_GUILD_ID, command.commandId);
+  await rest.delete(route);
+  const updatedCommands = slashCommands.filter((entry) => entry.name !== name);
+  try {
+    saveSlashCommands(updatedCommands);
+  } catch (error) {
+    const restored = await rest.post(Routes.applicationGuildCommands(client.user.id, ALLOWED_GUILD_ID), {
+      body: { name: command.name, description: command.description, type: 1 },
+    });
+    const restoredCommands = slashCommands.map((entry) => (
+      entry.name === name ? { ...entry, commandId: restored.id } : entry
+    ));
+    try {
+      saveSlashCommands(restoredCommands);
+      slashCommands = restoredCommands;
+    } catch (restoreError) {
+      throw new AggregateError(
+        [error, restoreError],
+        `La commande /${name} a été rétablie sur Discord, mais son fichier local n’a pas pu être mis à jour.`
+      );
+    }
+    throw error;
+  }
+  slashCommands = updatedCommands;
+  recordActivity('info', `Commande slash /${name} supprimée.`, { guildId: ALLOWED_GUILD_ID });
+  return true;
+});
 
 ipcMain.handle('save-config', async (event, newConfig) => {
   const guildId = String(newConfig.guildId || '');

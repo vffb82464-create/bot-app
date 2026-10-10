@@ -80,11 +80,15 @@ Le site refuse les comptes sans le rôle `1524502054423363787` et revérifie le 
 
 ### Bot déjà hébergé ailleurs : commandes du panel
 
-Pour contrôler le bot distant, remplace `index.js` et `package.json` sur hosting-bot.net par les deux fichiers complets fournis avec cette mise à jour. Fais une sauvegarde des fichiers actuels avant de les remplacer. Le manifeste conserve les dépendances existantes et ajoute `@discordjs/voice` et `play-dl` pour les fonctions vocales et musicales.
+Pour contrôler le bot distant, remplace `index.js` par `C:\Users\bonjo\Desktop\index-hosting-bot-panel-sync.js` et `package.json` par `C:\Users\bonjo\Desktop\package-hosting-bot-panel-sync.json` sur hosting-bot.net. Fais une sauvegarde des fichiers actuels avant de les remplacer. Le manifeste conserve les dépendances existantes et ajoute `@discordjs/voice` et `play-dl` pour les fonctions vocales et musicales.
 
 Dans **Env** de hosting-bot.net, garde `BOT_SYNC_SECRET` identique à la valeur configurée dans **Environment** sur Render. Le bot ouvre une connexion HTTPS sortante vers Render : il n’est pas nécessaire d’ajouter un port entrant ni de démarrer un second bot sur Render. Après le remplacement des fichiers, redémarre le bot et vérifie les logs. Active aussi **SERVER MEMBERS INTENT** et **PRESENCE INTENT** dans le portail développeur Discord pour utiliser les membres et les statistiques de présence.
 
 Le relais prend en charge les salons, messages, membres, modération, réglages, vocal, musique, logs et serveurs, uniquement sur le serveur autorisé `1508431497433190420`. L’action qui fait quitter le bot des autres serveurs demande une confirmation dans le panel. Le compte connecté au panel doit avoir le rôle `1524502054423363787`.
+
+Dans **Commandes** du panel, tu peux créer des commandes slash personnalisées avec un nom, une description et une réponse en texte. Elles sont enregistrées directement sur le serveur Discord autorisé; les réponses sont publiques et les commandes peuvent être supprimées depuis la même page. Pour que cette fonction soit disponible, téléverse aussi la nouvelle version de `index-hosting-bot-panel-sync.js` sur hosting-bot.net et redémarre le bot après le déploiement Render.
+
+La nouvelle mascotte est aussi utilisée pour l’icône du site et de la PWA installable. Pour les utilisateurs de l’application de bureau Windows, `app-512.png` est l’icône de la fenêtre. Une PWA déjà installée peut nécessiter une nouvelle installation pour actualiser son icône.
 
 ### Installer le panel sur un téléphone
 

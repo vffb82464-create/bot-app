@@ -92,7 +92,81 @@ navItems.forEach((btn) => {
     if (btn.dataset.view === 'voice') loadVoiceChannels();
     if (btn.dataset.view === 'servers') loadServerManagement();
     if (btn.dataset.view === 'settings') loadSettings();
+    if (btn.dataset.view === 'commands') loadSlashCommands();
   });
+});
+
+const slashCommandForm = document.getElementById('slash-command-form');
+const slashCommandList = document.getElementById('slash-command-list');
+const slashCommandStatus = document.getElementById('slash-command-status');
+
+function setSlashCommandStatus(message, isError = false) {
+  slashCommandStatus.textContent = message;
+  slashCommandStatus.classList.toggle('is-error', isError);
+}
+
+async function loadSlashCommands() {
+  slashCommandList.innerHTML = '<p class="empty-hint">Chargement des commandes…</p>';
+  try {
+    const commands = await window.api.getSlashCommands();
+    if (!Array.isArray(commands)) throw new Error('La liste de commandes reçue est invalide.');
+    if (!commands.length) {
+      slashCommandList.innerHTML = '<p class="empty-hint">Aucune commande personnalisée pour le moment.</p>';
+      return;
+    }
+
+    slashCommandList.innerHTML = commands.map((command) => `
+      <article class="slash-command-row">
+        <div class="slash-command-copy">
+          <strong>/${escapeHtml(command.name)}</strong>
+          <p>${escapeHtml(command.description)}</p>
+          <small>${escapeHtml(command.response)}</small>
+        </div>
+        <button class="btn-danger slash-command-delete" type="button" data-command-name="${escapeHtml(command.name)}">Supprimer</button>
+      </article>
+    `).join('');
+
+    slashCommandList.querySelectorAll('.slash-command-delete').forEach((button) => {
+      button.addEventListener('click', async () => {
+        const name = button.dataset.commandName;
+        if (!window.confirm(`Supprimer la commande /${name} du serveur Discord ?`)) return;
+        button.disabled = true;
+        try {
+          await window.api.deleteSlashCommand(name);
+          setSlashCommandStatus(`La commande /${name} a été supprimée.`);
+          await loadSlashCommands();
+        } catch (error) {
+          button.disabled = false;
+          setSlashCommandStatus(`Erreur : ${error.message}`, true);
+        }
+      });
+    });
+  } catch (error) {
+    slashCommandList.innerHTML = '<p class="empty-hint">Impossible de charger les commandes.</p>';
+    setSlashCommandStatus(`Erreur : ${error.message}`, true);
+  }
+}
+
+slashCommandForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  const submitButton = slashCommandForm.querySelector('button[type="submit"]');
+  const input = {
+    name: slashCommandForm.elements.name.value.trim(),
+    description: slashCommandForm.elements.description.value.trim(),
+    response: slashCommandForm.elements.response.value.trim(),
+  };
+  submitButton.disabled = true;
+  setSlashCommandStatus('Création et synchronisation de la commande avec Discord…');
+  try {
+    await window.api.createSlashCommand(input);
+    slashCommandForm.reset();
+    setSlashCommandStatus(`La commande /${input.name} est disponible dans Discord.`);
+    await loadSlashCommands();
+  } catch (error) {
+    setSlashCommandStatus(`Erreur : ${error.message}`, true);
+  } finally {
+    submitButton.disabled = false;
+  }
 });
 
 // ---------- Statut du bot ----------
@@ -481,8 +555,14 @@ window.api.onBotMessage((data) => {
 composer.addEventListener('submit', async (e) => {
   e.preventDefault();
   const content = messageInput.value.trim();
-  if (!content || !currentChannelId) return;
-  messageInput.value = '';
+  if (!content) return;
+  if (!currentChannelId) {
+    renderMessage({ author: 'Erreur', avatar: '', content: 'Choisis un salon dans Réglages avant d’envoyer un message.' });
+    return;
+  }
+
+  const sendButton = composer.querySelector('button[type="submit"]');
+  if (sendButton) sendButton.disabled = true;
   try {
     await window.api.sendMessage({
       channelId: currentChannelId,
@@ -490,6 +570,7 @@ composer.addEventListener('submit', async (e) => {
       replyToMessageId: replyTarget?.messageId || null,
     });
 
+    messageInput.value = '';
     renderMessage({ author: 'Toi', avatar: '', content });
     if (messagesEl.lastElementChild && messagesEl.lastElementChild.querySelector('img')) {
       messagesEl.lastElementChild.querySelector('img').remove();
@@ -498,6 +579,9 @@ composer.addEventListener('submit', async (e) => {
     updateReplyIndicator();
   } catch (err) {
     renderMessage({ author: 'Erreur', avatar: '', content: err.message });
+    messageInput.focus();
+  } finally {
+    if (sendButton) sendButton.disabled = false;
   }
 });
 
