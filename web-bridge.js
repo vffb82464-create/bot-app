@@ -16,6 +16,7 @@
       'new-message',
       'bot-message',
       'activity-log',
+      'panel-usage-log',
     ]) {
       eventSource.addEventListener(eventName, (event) => {
         const data = JSON.parse(event.data);
@@ -106,12 +107,23 @@
     getServerOverview: () => command('getServerOverview'),
     leaveOtherServers: () => command('leaveOtherServers'),
     getActivityLogs: () => command('getActivityLogs'),
+    getPanelUsageLogs: async () => {
+      await getSession();
+      const response = await fetch('/api/panel-usage-logs', { credentials: 'same-origin' });
+      const payload = await response.json().catch(() => ({}));
+      if (response.status === 401 || response.status === 403) {
+        window.location.assign('/login?denied=role');
+      }
+      if (!response.ok) throw new Error(payload.error || 'Impossible de charger les logs d’utilisation.');
+      return payload.entries;
+    },
     onBotStatus: (callback) => subscribe('bot-status', callback),
     onVoiceStatus: (callback) => subscribe('voice-status', callback),
     onMusicStatus: (callback) => subscribe('music-status', callback),
     onNewMessage: (callback) => subscribe('new-message', callback),
     onBotMessage: (callback) => subscribe('bot-message', callback),
     onActivityLog: (callback) => subscribe('activity-log', callback),
+    onPanelUsageLog: (callback) => subscribe('panel-usage-log', callback),
   };
 
   getSession().catch((error) => console.error('Discord session setup failed:', error));

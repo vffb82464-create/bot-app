@@ -988,6 +988,20 @@ button {
   font-size: 13px;
 }
 
+.panel-usage-actor {
+  overflow-wrap: anywhere;
+  font-size: 13px;
+}
+
+.panel-usage-entry .activity-entry-content small {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.panel-usage-entry .activity-entry-content .panel-usage-result.error {
+  color: var(--danger);
+}
+
 .activity-entry time {
   flex: 0 0 auto;
   color: var(--text-dim);

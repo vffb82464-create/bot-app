@@ -36,10 +36,12 @@ const ALLOWED_ROLE_IDS = new Set([
 ]);
 const ROLE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_ACTIVITY_LOGS = 200;
+const MAX_PANEL_USAGE_LOGS = 500;
 const DATA_PATH = process.env.DATA_DIR || path.join(__dirname, 'data');
 const CONFIG_PATH = path.join(DATA_PATH, 'config.json');
 const WARNINGS_PATH = path.join(DATA_PATH, 'warnings.json');
 const ACTIVITY_LOG_PATH = path.join(DATA_PATH, 'activity-logs.json');
+const PANEL_USAGE_LOG_PATH = path.join(DATA_PATH, 'panel-usage-logs.json');
 
 if ((!DISCORD_TOKEN && !BOT_SYNC_ONLY) || !CLIENT_ID || !CLIENT_SECRET || !SESSION_SECRET || !APP_URL) {
   throw new Error(
@@ -108,6 +110,7 @@ const guildsBeingRemoved = new Set();
 let config = loadJson(CONFIG_PATH, DEFAULT_CONFIG);
 let warnings = loadJson(WARNINGS_PATH, []);
 let activityLogs = loadJson(ACTIVITY_LOG_PATH, []).slice(0, MAX_ACTIVITY_LOGS);
+let panelUsageLogs = loadJson(PANEL_USAGE_LOG_PATH, []).slice(0, MAX_PANEL_USAGE_LOGS);
 let activeVoiceConnection = null;
 let audioPlayer = null;
 let currentMusic = { title: '', playing: false };
@@ -165,6 +168,24 @@ function recordActivity(type, message, details = {}) {
     console.error('Impossible d’enregistrer le journal d’activité :', error);
   }
   sendEvent('activity-log', entry);
+}
+
+function recordPanelUsage(user, action, status = 'success') {
+  const entry = {
+    id: crypto.randomUUID(),
+    timestamp: new Date().toISOString(),
+    userId: String(user.id),
+    username: String(user.username || 'Utilisateur Discord').slice(0, 100),
+    action,
+    status,
+  };
+  panelUsageLogs = [entry, ...panelUsageLogs].slice(0, MAX_PANEL_USAGE_LOGS);
+  try {
+    saveJson(PANEL_USAGE_LOG_PATH, panelUsageLogs);
+  } catch (error) {
+    console.error('Impossible d’enregistrer les logs d’utilisation du panel :', error);
+  }
+  sendEvent('panel-usage-log', entry);
 }
 
 function configForUser() {
@@ -225,6 +246,10 @@ async function verifyRequiredRole(req, res, next) {
 
     req.session.discord.hasRequiredRole = true;
     req.session.discord.roleCheckedAt = Date.now();
+    if (!req.session.discord.usageLogged) {
+      recordPanelUsage(req.session.discord, 'Connexion au panel', 'success');
+      req.session.discord.usageLogged = true;
+    }
     return next();
   } catch (error) {
     if (error.status === 401 || error.status === 403 || error.status === 404) {
@@ -406,7 +431,7 @@ app.get('/login', (req, res) => {
   res.type('html').send(`<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121319"><link rel="manifest" href="/manifest.webmanifest">
-<link rel="icon" type="image/png" href="/icons/panel-192.png?v=3"><link rel="apple-touch-icon" href="/icons/panel-192.png?v=3"><link rel="stylesheet" href="/style.css?v=mobile-scroll-1">
+<link rel="icon" type="image/png" href="/icons/panel-192.png?v=3"><link rel="apple-touch-icon" href="/icons/panel-192.png?v=3"><link rel="stylesheet" href="/style.css?v=usage-logs-1">
 <script src="/pwa.js?v=slash-commands-2" defer></script>
 <title>Connexion Discord — Panel Bot</title><style>
 *{box-sizing:border-box}
@@ -579,6 +604,9 @@ app.get('/auth/callback', async (req, res, next) => {
 });
 
 app.get('/auth/logout', (req, res) => {
+  if (req.session.discord?.usageLogged) {
+    recordPanelUsage(req.session.discord, 'Déconnexion du panel', 'success');
+  }
   req.session.destroy((error) => {
     if (error) return res.status(500).send('Impossible de fermer la session.');
     res.clearCookie('panel.sid', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
@@ -660,6 +688,11 @@ app.use('/api', verifyRequiredRole, (req, res, next) => {
     return res.status(403).json({ error: 'La vérification de sécurité a échoué. Recharge le site.' });
   }
   return next();
+});
+
+app.get('/api/panel-usage-logs', (req, res) => {
+  res.set('Cache-Control', 'no-store');
+  res.json({ entries: panelUsageLogs });
 });
 
 function requestHostedBotCommand(name, args) {
@@ -1293,19 +1326,47 @@ const allowedCommands = new Set([
   'resumeMusic', 'stopMusic',
 ]);
 
+const panelUsageActions = {
+  saveConfig: 'Modification des réglages du bot',
+  sendMessage: 'Envoi d’un message Discord',
+  sendGif: 'Envoi d’un GIF',
+  sendAnnouncement: 'Publication d’une annonce',
+  kickMember: 'Expulsion d’un membre',
+  banMember: 'Bannissement d’un membre',
+  timeoutMember: 'Timeout d’un membre',
+  warnMember: 'Avertissement d’un membre',
+  setBotStatus: 'Modification du statut du bot',
+  joinVoice: 'Connexion à un salon vocal',
+  leaveVoice: 'Déconnexion du salon vocal',
+  disconnectVoice: 'Déconnexion du salon vocal',
+  playMusic: 'Lancement de musique',
+  pauseMusic: 'Pause de la musique',
+  resumeMusic: 'Reprise de la musique',
+  stopMusic: 'Arrêt de la musique',
+  createSlashCommand: 'Création d’une commande slash',
+  deleteSlashCommand: 'Suppression d’une commande slash',
+  leaveOtherServers: 'Nettoyage des autres serveurs',
+};
+
 app.post('/api/command', async (req, res) => {
   const { name, args } = req.body || {};
   if (typeof name !== 'string' || !allowedCommands.has(name) || !Array.isArray(args)) {
     return res.status(400).json({ error: 'Commande invalide.' });
   }
+  const action = panelUsageActions[name];
   try {
     if (BOT_SYNC_ONLY && name !== 'searchGifs' && name !== 'getServerOverview') {
       const result = await requestHostedBotCommand(name, args);
+      if (action) recordPanelUsage(req.session.discord, action, 'success');
       return res.json({ result });
     }
     const result = await executeCommand(name, args);
+    if (action) recordPanelUsage(req.session.discord, action, 'success');
     return res.json({ result });
   } catch (error) {
+    if (action && req.session.discord) {
+      recordPanelUsage(req.session.discord, action, 'error');
+    }
     recordActivity('error', `Erreur pendant « ${name} » : ${error.message}`);
     return res.status(400).json({ error: error.message });
   }

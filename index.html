@@ -8,7 +8,7 @@
 <link rel="icon" type="image/png" href="/icons/panel-192.png?v=3" />
 <link rel="apple-touch-icon" href="/icons/panel-192.png?v=3" />
 <title>Panel Bot Discord</title>
-<link rel="stylesheet" href="style.css?v=mobile-scroll-1" />
+<link rel="stylesheet" href="style.css?v=usage-logs-1" />
 <script src="/pwa.js?v=slash-commands-2" defer></script>
 </head>
 <body>
@@ -156,6 +156,14 @@
           <div class="dash-card">
             <span class="dash-label">Salons</span>
             <strong id="log-channels">0</strong>
+          </div>
+        </div>
+
+        <div class="panel wide-panel">
+          <h2>Utilisation du bot depuis le panel</h2>
+          <p class="hint">Connexions et actions, avec le compte Discord et l’heure. Le contenu des messages n’est pas enregistré. Ces logs sont visibles aux utilisateurs autorisés du panel.</p>
+          <div id="panel-usage-list" class="activity-feed" aria-live="polite">
+            <p class="activity-empty">Chargement des logs d’utilisation…</p>
           </div>
         </div>
 
@@ -360,7 +368,7 @@
     <button class="btn-primary update-greeting-button" id="update-greeting-button" type="button">Bonjour !</button>
   </dialog>
 
-  <script src="web-bridge.js?v=slash-commands-2"></script>
-  <script src="renderer.js?v=slash-commands-2"></script>
+  <script src="web-bridge.js?v=usage-logs-1"></script>
+  <script src="renderer.js?v=usage-logs-1"></script>
 </body>
 </html>

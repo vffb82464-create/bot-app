@@ -78,6 +78,8 @@ npm install
 
 Le site refuse les comptes sans l’un de ces quatre rôles et revérifie l’accès périodiquement ainsi qu’avant les actions. Le bot doit être membre du serveur autorisé et y disposer des permissions correspondant aux fonctions utilisées. Les clés restent dans **Environment** sur Render, jamais dans GitHub. Le service gratuit n’offre pas de disque persistant : ses journaux locaux peuvent être effacés lorsque Render redémarre ou redéploie le service. Pour conserver les journaux, configure un disque persistant Render et `DATA_DIR=/var/data`.
 
+Dans l’onglet **Logs**, la section **Utilisation du bot depuis le panel** montre les connexions au panel et les actions effectuées, avec le nom et l’ID Discord du compte ainsi que l’heure. Elle n’enregistre pas le contenu des messages ni les arguments privés des actions. Les logs sont visibles par les utilisateurs possédant l’un des rôles autorisés; un maximum de 500 entrées est conservé dans `panel-usage-logs.json`. Sur l’offre Render sans disque persistant, ces entrées peuvent être perdues lors d’un redémarrage ou d’un déploiement.
+
 ### Bot déjà hébergé ailleurs : commandes du panel
 
 Pour contrôler le bot distant, remplace `index.js` par `C:\Users\bonjo\Desktop\index-hosting-bot-panel-sync.js` et `package.json` par `C:\Users\bonjo\Desktop\package-hosting-bot-panel-sync.json` sur hosting-bot.net. Fais une sauvegarde des fichiers actuels avant de les remplacer. Le manifeste conserve les dépendances existantes et ajoute `@discordjs/voice` et `play-dl` pour les fonctions vocales et musicales.

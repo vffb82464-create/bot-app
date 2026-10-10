@@ -66,6 +66,7 @@ if (window.location.protocol === 'file:') {
 let serverOverview = null;
 let isLeavingOtherServers = false;
 let activityEntries = [];
+let panelUsageEntries = [];
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>"']/g, (character) => ({
@@ -694,8 +695,68 @@ async function loadLogs() {
     }
   }
 
-  activityEntries = await window.api.getActivityLogs();
+  [activityEntries, panelUsageEntries] = await Promise.all([
+    window.api.getActivityLogs(),
+    window.api.getPanelUsageLogs(),
+  ]);
   renderActivityLogs();
+  renderPanelUsageLogs();
+}
+
+function renderPanelUsageLogs() {
+  const container = document.getElementById('panel-usage-list');
+  if (!container) return;
+
+  if (!panelUsageEntries.length) {
+    const empty = document.createElement('p');
+    empty.className = 'activity-empty';
+    empty.textContent = 'Aucune connexion ou action enregistrée pour le moment.';
+    container.replaceChildren(empty);
+    return;
+  }
+
+  const fragment = document.createDocumentFragment();
+  panelUsageEntries.forEach((entry) => {
+    const row = document.createElement('article');
+    row.className = `activity-entry panel-usage-entry ${entry.status === 'error' ? 'error' : 'success'}`;
+
+    const mark = document.createElement('span');
+    mark.className = 'activity-entry-mark';
+    mark.textContent = entry.status === 'error' ? '×' : '●';
+    row.appendChild(mark);
+
+    const content = document.createElement('div');
+    content.className = 'activity-entry-content';
+    const actor = document.createElement('strong');
+    actor.className = 'panel-usage-actor';
+    actor.textContent = entry.username || 'Utilisateur Discord';
+    content.appendChild(actor);
+
+    const userId = document.createElement('small');
+    userId.textContent = `ID Discord : ${entry.userId}`;
+    content.appendChild(userId);
+
+    const action = document.createElement('span');
+    action.textContent = entry.action;
+    content.appendChild(action);
+    if (entry.status === 'error') {
+      const result = document.createElement('small');
+      result.className = 'panel-usage-result error';
+      result.textContent = 'Action échouée';
+      content.appendChild(result);
+    }
+    row.appendChild(content);
+
+    const time = document.createElement('time');
+    time.dateTime = entry.timestamp;
+    const timestamp = new Date(entry.timestamp);
+    time.textContent = Number.isNaN(timestamp.getTime())
+      ? ''
+      : timestamp.toLocaleString('fr-FR');
+    row.appendChild(time);
+    fragment.appendChild(row);
+  });
+  container.replaceChildren(fragment);
 }
 
 function renderActivityLogs() {
@@ -760,6 +821,11 @@ window.api.onActivityLog((entry) => {
   ) {
     loadServerManagement();
   }
+});
+
+window.api.onPanelUsageLog((entry) => {
+  panelUsageEntries = [entry, ...panelUsageEntries.filter((item) => item.id !== entry.id)].slice(0, 500);
+  renderPanelUsageLogs();
 });
 
 function renderServerManagement() {
