@@ -431,7 +431,7 @@ app.get('/login', (req, res) => {
   res.type('html').send(`<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121319"><link rel="manifest" href="/manifest.webmanifest">
-<link rel="icon" type="image/png" href="/icons/panel-192.png?v=3"><link rel="apple-touch-icon" href="/icons/panel-192.png?v=3"><link rel="stylesheet" href="/style.css?v=usage-logs-1">
+<link rel="icon" type="image/png" href="/icons/panel-192.png?v=3"><link rel="apple-touch-icon" href="/icons/panel-192.png?v=3"><link rel="stylesheet" href="/style.css?v=mobile-clean-1">
 <script src="/pwa.js?v=slash-commands-2" defer></script>
 <title>Connexion Discord — Panel Bot</title><style>
 *{box-sizing:border-box}
