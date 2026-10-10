@@ -10,7 +10,7 @@
     "send": "node send.js",
     "shortcut": "powershell -ExecutionPolicy Bypass -File ./update-desktop-shortcut.ps1",
     "icon:mac": "bash ./scripts/build-mac-icon.sh",
-    "dist:mac": "electron-builder --mac"
+    "dist:mac": "electron-builder --mac --publish never"
   },
   "author": "",
   "license": "ISC",
