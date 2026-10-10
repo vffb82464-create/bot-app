@@ -28,20 +28,13 @@ const BOT_SYNC_ONLY = process.env.BOT_SYNC_ONLY === 'true';
 const GIPHY_API_KEY = process.env.GIPHY_API_KEY;
 const ALLOWED_GUILD_ID = '1508431497433190420';
 const ALLOWED_GUILD_NAME = 'ZEFYXX COMMUNAUTÉ !';
-const ALLOWED_ROLE_IDS = new Set([
-  '1549853790742646856',
-  '1549293460345851922',
-  '1552764819222954006',
-  '1524502220023005234',
-]);
-const PANEL_ADMIN_PASSWORD = process.env.PANEL_ADMIN_PASSWORD;
+const ALLOWED_ROLE_ID = '1524502054423363787';
 const ROLE_CHECK_INTERVAL_MS = 5 * 60 * 1000;
 const MAX_ACTIVITY_LOGS = 200;
 const DATA_PATH = process.env.DATA_DIR || path.join(__dirname, 'data');
 const CONFIG_PATH = path.join(DATA_PATH, 'config.json');
 const WARNINGS_PATH = path.join(DATA_PATH, 'warnings.json');
 const ACTIVITY_LOG_PATH = path.join(DATA_PATH, 'activity-logs.json');
-const ADMIN_ACTIVITY_LOG_PATH = path.join(DATA_PATH, 'admin-activity-logs.json');
 
 if ((!DISCORD_TOKEN && !BOT_SYNC_ONLY) || !CLIENT_ID || !CLIENT_SECRET || !SESSION_SECRET || !APP_URL) {
   throw new Error(
@@ -55,10 +48,6 @@ if (BOT_SYNC_ONLY && (!BOT_SYNC_SECRET || BOT_SYNC_SECRET.length < 32)) {
 if (SESSION_SECRET.length < 32) {
   throw new Error('SESSION_SECRET doit contenir au moins 32 caractères aléatoires.');
 }
-if (PANEL_ADMIN_PASSWORD && PANEL_ADMIN_PASSWORD.length < 24) {
-  throw new Error('PANEL_ADMIN_PASSWORD doit contenir au moins 24 caractères aléatoires.');
-}
-
 fs.mkdirSync(DATA_PATH, { recursive: true });
 
 const app = express();
@@ -72,7 +61,6 @@ app.use((req, res, next) => {
   next();
 });
 app.use(express.json({ limit: '2mb' }));
-app.use(express.urlencoded({ extended: false, limit: '4kb' }));
 app.use(session({
   name: 'panel.sid',
   secret: SESSION_SECRET,
@@ -115,10 +103,6 @@ const guildsBeingRemoved = new Set();
 let config = loadJson(CONFIG_PATH, DEFAULT_CONFIG);
 let warnings = loadJson(WARNINGS_PATH, []);
 let activityLogs = loadJson(ACTIVITY_LOG_PATH, []).slice(0, MAX_ACTIVITY_LOGS);
-let adminActivityLogs = loadJson(ADMIN_ACTIVITY_LOG_PATH, [])
-  .map(normalizeAdminActivity)
-  .filter(Boolean)
-  .slice(0, MAX_ACTIVITY_LOGS);
 let activeVoiceConnection = null;
 let audioPlayer = null;
 let currentMusic = { title: '', playing: false };
@@ -128,7 +112,6 @@ let remoteBotSnapshot = {
   guilds: [],
   config: null,
   logs: [],
-  adminLogs: [],
   tag: null,
   voiceStatus: { connected: false },
   musicStatus: { title: '', playing: false },
@@ -179,38 +162,6 @@ function recordActivity(type, message, details = {}) {
   sendEvent('activity-log', entry);
 }
 
-function normalizeAdminActivity(entry) {
-  if (!entry || typeof entry !== 'object') return null;
-  if (typeof entry.userId !== 'string' || !/^\d{17,20}$/.test(entry.userId)) return null;
-  if (typeof entry.username !== 'string' || typeof entry.action !== 'string') return null;
-  const timestamp = typeof entry.timestamp === 'string' && !Number.isNaN(Date.parse(entry.timestamp))
-    ? new Date(entry.timestamp).toISOString()
-    : new Date().toISOString();
-  return {
-    id: typeof entry.id === 'string' ? entry.id.slice(0, 100) : crypto.randomUUID(),
-    timestamp,
-    username: entry.username.slice(0, 100),
-    userId: entry.userId,
-    guildId: ALLOWED_GUILD_ID,
-    channelName: typeof entry.channelName === 'string' ? entry.channelName.slice(0, 100) : '',
-    channelId: typeof entry.channelId === 'string' && /^\d{17,20}$/.test(entry.channelId)
-      ? entry.channelId
-      : '',
-    action: entry.action.slice(0, 100),
-  };
-}
-
-function recordAdminActivity(entry) {
-  const normalized = normalizeAdminActivity(entry);
-  if (!normalized) return;
-  adminActivityLogs = [normalized, ...adminActivityLogs].slice(0, MAX_ACTIVITY_LOGS);
-  try {
-    saveJson(ADMIN_ACTIVITY_LOG_PATH, adminActivityLogs);
-  } catch (error) {
-    console.error('Impossible d’enregistrer le journal admin :', error);
-  }
-}
-
 function configForUser() {
   return {
     ...(remoteBotSnapshot.config || config),
@@ -259,12 +210,11 @@ async function verifyRequiredRole(req, res, next) {
       `https://discord.com/api/users/@me/guilds/${ALLOWED_GUILD_ID}/member`,
       { headers: { Authorization: `Bearer ${req.session.discord.accessToken}` } }
     );
-    const hasRequiredRole = Array.isArray(member.roles)
-      && member.roles.some((roleId) => ALLOWED_ROLE_IDS.has(roleId));
+    const hasRequiredRole = Array.isArray(member.roles) && member.roles.includes(ALLOWED_ROLE_ID);
     if (!hasRequiredRole) {
       req.session.destroy(() => {});
       if (!req.originalUrl.startsWith('/api/')) return res.redirect('/login?denied=role');
-      return res.status(403).json({ error: 'Un des rôles Discord autorisés est nécessaire.' });
+      return res.status(403).json({ error: `Le rôle Discord requis (${ALLOWED_ROLE_ID}) est nécessaire.` });
     }
 
     req.session.discord.hasRequiredRole = true;
@@ -356,9 +306,6 @@ function updateHostedBotSnapshot(snapshot) {
   const incomingLogs = Array.isArray(snapshot.logs)
     ? snapshot.logs.filter((entry) => entry && typeof entry.message === 'string').slice(0, MAX_ACTIVITY_LOGS)
     : remoteBotSnapshot.logs;
-  const incomingAdminLogs = Array.isArray(snapshot.adminLogs)
-    ? snapshot.adminLogs.map(normalizeAdminActivity).filter(Boolean).slice(0, MAX_ACTIVITY_LOGS)
-    : remoteBotSnapshot.adminLogs;
   const now = Date.now();
   remoteBotSnapshot = {
     ...remoteBotSnapshot,
@@ -366,7 +313,6 @@ function updateHostedBotSnapshot(snapshot) {
     guilds,
     config: snapshot.config && typeof snapshot.config === 'object' ? snapshot.config : remoteBotSnapshot.config,
     logs: incomingLogs,
-    adminLogs: incomingAdminLogs,
     tag: typeof snapshot.tag === 'string' ? snapshot.tag : remoteBotSnapshot.tag,
     voiceStatus: snapshot.voiceStatus && typeof snapshot.voiceStatus === 'object'
       ? snapshot.voiceStatus
@@ -454,7 +400,7 @@ app.get('/login', (req, res) => {
   res.type('html').send(`<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121319"><link rel="manifest" href="/manifest.webmanifest">
-<link rel="icon" type="image/png" href="/icons/panel-192.png?v=2"><link rel="apple-touch-icon" href="/icons/panel-192.png?v=2"><link rel="stylesheet" href="/style.css?v=mobile-admin-roles-3">
+<link rel="icon" type="image/png" href="/icons/panel-192.png?v=2"><link rel="apple-touch-icon" href="/icons/panel-192.png?v=2"><link rel="stylesheet" href="/style.css?v=slash-commands-2">
 <script src="/pwa.js?v=slash-commands-2" defer></script>
 <title>Connexion Discord — Panel Bot</title><style>
 *{box-sizing:border-box}
@@ -500,27 +446,6 @@ h2{margin:0;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:26p
 @media(max-width:760px){body{padding:max(24px,env(safe-area-inset-top)) 18px max(24px,env(safe-area-inset-bottom))}.login-layout{max-width:460px;grid-template-columns:1fr;gap:25px}.intro{padding:0}.eyebrow{margin:23px 0 10px}h1{font-size:clamp(34px,10vw,46px)}.lead{margin-top:12px;font-size:15px;line-height:1.55}.features{grid-template-columns:1fr;gap:9px;margin-top:19px}.features li{font-size:13px}.feature-icon{width:30px;height:30px}.login-card{padding:23px;border-radius:19px}.card-copy{margin-bottom:18px}}
 @media(max-width:380px){html,body{width:100%;min-width:0}body{padding-right:13px;padding-left:13px}.features{display:none}.login-card{padding:20px}}
 @media(prefers-reduced-motion:reduce){*,*::before,*::after{scroll-behavior:auto!important;transition:none!important}}
-.login-scroll-cue{display:none}
-@media(max-width:760px){
-html,body{min-width:0;overscroll-behavior-y:contain}
-body{display:block;padding:calc(24px + env(safe-area-inset-top)) 18px calc(28px + env(safe-area-inset-bottom));touch-action:pan-y}
-.login-layout{margin:0 auto;gap:18px}
-.intro{padding:0}
-.eyebrow{margin-top:24px}
-.features{grid-template-columns:repeat(3,minmax(0,1fr));gap:7px;margin-top:18px}
-.features li{align-items:flex-start;gap:7px;font-size:11px;line-height:1.35}
-.feature-icon{width:24px;height:24px;border-radius:8px}
-.server-badge{margin:16px 0 0;padding:10px}
-.login-scroll-cue{display:flex;min-height:38px;align-items:center;justify-content:center;gap:8px;color:#aaaaff;font-size:12px;text-decoration:none}
-.login-scroll-cue span:last-child{font-size:18px;line-height:1}
-.login-card{padding:20px}
-.role-note{margin-top:16px;padding:11px}
-.privacy-note{margin-top:13px}
-}
-@media(max-width:380px){
-.features{display:grid}
-.features li{font-size:10px}
-}
 </style></head><body><div class="login-layout">
 <section class="intro" aria-labelledby="welcome-title">
 <div class="brand"><span class="brand-mark" aria-hidden="true"><img src="/panel-icon.svg?v=2" alt=""></span><span>Panel Bot</span></div>
@@ -534,178 +459,16 @@ body{display:block;padding:calc(24px + env(safe-area-inset-top)) 18px calc(28px 
 </ul>
 <div class="server-badge"><span class="server-badge-icon" aria-hidden="true"><svg viewBox="0 0 24 24" focusable="false"><path d="M4 5.5A2.5 2.5 0 0 1 6.5 3h11A2.5 2.5 0 0 1 20 5.5v9a2.5 2.5 0 0 1-2.5 2.5h-5.9l-4.8 3.2c-.8.5-1.8 0-1.8-.9V17A2.5 2.5 0 0 1 4 14.5z"/><circle cx="9" cy="10" r="1.2"/><circle cx="15" cy="10" r="1.2"/></svg></span><span class="server-badge-copy"><small>Serveur Discord connecté au panel</small><strong>${ALLOWED_GUILD_NAME}</strong></span></div>
 </section>
-<a class="login-scroll-cue" href="#login-panel" aria-label="Faire défiler jusqu’à la connexion"><span>Glisse vers le bas pour te connecter</span><span aria-hidden="true">↓</span></a>
-<main class="login-card" id="login-panel">
+<main class="login-card">
 <p class="card-kicker">Espace sécurisé</p><h2>Connecte-toi</h2>
-<p class="card-copy">Utilise Discord pour ouvrir ta session. Nous vérifions que tu es membre du serveur et que tu possèdes au moins un des quatre rôles autorisés.</p>
+<p class="card-copy">Utilise Discord pour ouvrir ta session. Nous vérifions l’accès au serveur et au rôle autorisés avant d’afficher le panel.</p>
 ${denied ? `<p class="error" role="alert">${denied}</p>` : ''}
 <a class="discord-button" href="/auth/discord"><svg class="discord-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.73 5.36A19.4 19.4 0 0 0 14.94 3.9l-.23.47a18 18 0 0 0-5.42 0l-.24-.47a19.3 19.3 0 0 0-4.78 1.46C1.24 9.02.42 12.6.83 16.14a19.5 19.5 0 0 0 5.86 2.96l1.27-2.06a12.7 12.7 0 0 1-2-.96l.49-.38a13.9 13.9 0 0 0 11.1 0l.5.38a12.8 12.8 0 0 1-2.02.96l1.27 2.06a19.4 19.4 0 0 0 5.86-2.96c.49-4.1-.83-7.64-3.43-10.78ZM8.54 14.5c-1.08 0-1.96-.99-1.96-2.2s.86-2.2 1.96-2.2 1.98.99 1.96 2.2c0 1.21-.86 2.2-1.96 2.2Zm6.92 0c-1.08 0-1.96-.99-1.96-2.2s.86-2.2 1.96-2.2 1.98.99 1.96 2.2c0 1.21-.86 2.2-1.96 2.2Z"/></svg>Continuer avec Discord</a>
 <button class="install-app-btn" id="install-app-btn" type="button">Installer l’application</button>
 <p class="install-app-status" id="install-app-status" role="status" aria-live="polite"></p>
-<div class="role-note"><span class="role-note-icon" aria-hidden="true">ⓘ</span><div><strong>Accès réservé</strong><span>Ton compte doit être membre du serveur et avoir au moins un des quatre rôles autorisés.</span></div></div>
-<p class="privacy-note">La connexion passe par Discord. Ton mot de passe Discord n’est jamais demandé par ce site. Le journal admin peut conserver ton identifiant, les commandes utilisées et les mentions du bot, sans enregistrer le texte des messages ni les MP.</p>
-<p class="privacy-note"><a href="/admin/login" style="color:#aaaaff">Connexion admin</a></p>
-</main></div><script>
-let loginTouchStart = null;
-document.addEventListener('touchstart', (event) => {
-  if (event.touches.length === 1) loginTouchStart = { y: event.touches[0].clientY, scrollY: window.scrollY };
-}, { passive: true });
-document.addEventListener('touchend', (event) => {
-  if (!loginTouchStart || !window.matchMedia('(max-width: 760px)').matches) return;
-  const delta = event.changedTouches[0].clientY - loginTouchStart.y;
-  if (delta > 55 && loginTouchStart.scrollY < 24) {
-    document.getElementById('login-panel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-  }
-  loginTouchStart = null;
-}, { passive: true });
-</script></body></html>`);
-});
-
-const adminLoginAttempts = new Map();
-const ADMIN_LOGIN_WINDOW_MS = 15 * 60 * 1000;
-const ADMIN_LOGIN_MAX_ATTEMPTS = 5;
-
-function requireAdminSession(req, res, next) {
-if (req.session.adminAuthenticated) return next();
-if (req.path.startsWith('/api/')) return res.status(401).json({ error: 'Connexion admin requise.' });
-return res.redirect('/admin/login');
-}
-
-function validAdminCsrf(req) {
-const token = req.body?.csrfToken;
-return typeof token === 'string'
-  && typeof req.session.adminCsrfToken === 'string'
-  && safeEqual(token, req.session.adminCsrfToken);
-}
-
-app.get('/admin/login', (req, res) => {
-if (req.session.adminAuthenticated) return res.redirect('/admin');
-if (!PANEL_ADMIN_PASSWORD) {
-  return res.status(503).type('html').send(
-    '<!doctype html><html lang="fr"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
-    + '<title>Admin indisponible</title><body style="font:16px system-ui;max-width:36rem;margin:4rem auto;padding:1rem">'
-    + '<h1>Connexion admin indisponible</h1><p>Configure PANEL_ADMIN_PASSWORD dans les variables secrètes de Render '
-    + 'avec une valeur aléatoire d’au moins 24 caractères, puis redémarre le service.</p></body></html>'
-  );
-}
-if (typeof req.session.adminCsrfToken !== 'string') {
-  req.session.adminCsrfToken = crypto.randomBytes(32).toString('hex');
-}
-const error = req.query.error === '1'
-  ? '<p role="alert">Mot de passe incorrect. Vérifie la valeur secrète configurée sur Render.</p>'
-  : '';
-res.type('html').send(`<!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#121319"><title>Connexion admin — Panel Bot</title>
-<style>
-*{box-sizing:border-box}body{min-height:100svh;margin:0;display:grid;place-items:center;padding:20px;background:#121319;color:#e7e7ea;font:16px system-ui,sans-serif}
-main{width:min(420px,100%);padding:28px;border:1px solid #303343;border-radius:20px;background:#1a1c24;box-shadow:0 24px 70px #0006}
-h1{margin:0 0 10px;font-size:25px}p{color:#b5b7c6;line-height:1.55}label{display:block;margin:20px 0 8px;font-size:14px}
-input,button{width:100%;min-height:48px;padding:12px;border:1px solid #383b4a;border-radius:10px;background:#121319;color:#f2f3fa;font:inherit}
-button{margin-top:14px;border:0;background:#6264e8;font-weight:700;cursor:pointer} [role=alert]{color:#ffb1b5}
-</style></head><body><main><h1>Administration du bot</h1>
-<p>Accès réservé. Ce tableau affiche uniquement les commandes et interactions, jamais le contenu des messages.</p>
-${error}<form method="post" action="/admin/login">
-<input type="hidden" name="csrfToken" value="${req.session.adminCsrfToken}">
-<label for="admin-password">Mot de passe admin</label>
-<input id="admin-password" name="password" type="password" autocomplete="current-password" required>
-<button type="submit">Se connecter</button></form></main></body></html>`);
-});
-
-app.post('/admin/login', (req, res) => {
-if (!PANEL_ADMIN_PASSWORD) return res.sendStatus(503);
-if (!validAdminCsrf(req)) return res.status(403).send('La vérification de sécurité a échoué. Recharge la page.');
-
-const address = req.ip;
-const now = Date.now();
-let attempts = adminLoginAttempts.get(address);
-if (!attempts || now >= attempts.resetAt) {
-  attempts = { count: 0, resetAt: now + ADMIN_LOGIN_WINDOW_MS };
-  adminLoginAttempts.set(address, attempts);
-}
-if (attempts.count >= ADMIN_LOGIN_MAX_ATTEMPTS) {
-  return res.status(429).send('Trop de tentatives. Réessaie dans 15 minutes.');
-}
-
-const suppliedPassword = typeof req.body?.password === 'string' ? req.body.password : '';
-if (!safeEqual(suppliedPassword, PANEL_ADMIN_PASSWORD)) {
-  attempts.count += 1;
-  return res.redirect(303, '/admin/login?error=1');
-}
-
-adminLoginAttempts.delete(address);
-const discordSession = req.session.discord;
-return req.session.regenerate((error) => {
-  if (error) return res.status(500).send('Impossible de démarrer la session admin.');
-  req.session.discord = discordSession;
-  req.session.adminAuthenticated = true;
-  req.session.adminCsrfToken = crypto.randomBytes(32).toString('hex');
-  return req.session.save((saveError) => {
-    if (saveError) return res.status(500).send('Impossible d’enregistrer la session admin.');
-    return res.redirect(303, '/admin');
-  });
-});
-});
-
-app.get('/admin', requireAdminSession, (req, res) => {
-const csrfToken = req.session.adminCsrfToken || '';
-res.type('html').send(`<!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
-<meta name="theme-color" content="#121319"><title>Logs admin — Panel Bot</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#121319;color:#e7e7ea;font:15px system-ui,sans-serif}
-main{width:min(960px,100%);margin:0 auto;padding:clamp(18px,4vw,40px)}header{display:flex;align-items:center;justify-content:space-between;gap:16px}
-h1{margin:0;font-size:clamp(24px,5vw,34px)}p{color:#aeb0bf;line-height:1.55}.notice{margin:20px 0;padding:14px;border:1px solid #393b58;border-radius:12px;background:#1a1c24}
-button{min-height:42px;padding:8px 14px;border:1px solid #393b58;border-radius:10px;background:#20222c;color:#f2f3fa;font:inherit;cursor:pointer}
-#admin-log-list{display:grid;gap:10px}.entry{padding:14px;border:1px solid #2a2d38;border-radius:12px;background:#1a1c24}
-.entry strong,.entry span,.entry small{display:block;overflow-wrap:anywhere}.entry small{margin-top:5px;color:#8b8d98}.empty{padding:24px;text-align:center;border:1px dashed #383b4a;border-radius:12px;color:#aeb0bf}
-@media(max-width:520px){header{align-items:flex-start;flex-direction:column}header form,header button{width:100%}.entry{padding:12px}}
-</style></head><body><main><header><h1>Journal admin</h1>
-<form method="post" action="/admin/logout"><input type="hidden" name="csrfToken" value="${csrfToken}"><button type="submit">Déconnexion</button></form></header>
-<p class="notice">Journal limité aux commandes slash, aux mentions du bot dans le serveur autorisé et aux actions lancées depuis le panel.
-Aucun texte de message ni conversation privée n’est enregistré. Seuls les 200 événements les plus récents sont conservés.</p>
-<section id="admin-log-list" aria-live="polite"><p class="empty">Chargement des événements…</p></section></main>
-<script>
-const list=document.getElementById('admin-log-list');
-function render(logs){
-if(!Array.isArray(logs)||logs.length===0){const empty=document.createElement('p');empty.className='empty';empty.textContent='Aucune interaction enregistrée pour le moment.';list.replaceChildren(empty);return;}
-const fragment=document.createDocumentFragment();
-for(const log of logs){
-  const row=document.createElement('article');row.className='entry';
-  const actor=document.createElement('strong');actor.textContent=(log.username||'Utilisateur')+' ('+(log.userId||'ID indisponible')+')';
-  const action=document.createElement('span');action.textContent=log.action||'Interaction';
-  const details=document.createElement('small');const timestamp=new Date(log.timestamp);
-  details.textContent=(Number.isNaN(timestamp.getTime())?'':timestamp.toLocaleString('fr-FR'))+(log.channelName?' · #'+log.channelName:'');
-  row.append(actor,action,details);fragment.append(row);
-}
-list.replaceChildren(fragment);
-}
-async function refresh(){
-try{const response=await fetch('/api/admin/logs',{cache:'no-store',credentials:'same-origin'});
-  if(response.status===401){location.assign('/admin/login');return;}
-  if(!response.ok)throw new Error('Le journal admin est indisponible ('+response.status+').');
-  const payload=await response.json();render(payload.logs);
-}catch(error){const message=document.createElement('p');message.className='empty';message.textContent=error.message;list.replaceChildren(message);}
-}
-refresh();setInterval(refresh,20000);
-</script></body></html>`);
-});
-
-app.get('/api/admin/logs', requireAdminSession, (req, res) => {
-const logs = [...adminActivityLogs, ...remoteBotSnapshot.adminLogs]
-  .sort((left, right) => Date.parse(right.timestamp) - Date.parse(left.timestamp))
-  .slice(0, MAX_ACTIVITY_LOGS);
-res.set('Cache-Control', 'no-store');
-res.json({ logs });
-});
-
-app.post('/admin/logout', requireAdminSession, (req, res) => {
-if (!validAdminCsrf(req)) return res.status(403).send('La vérification de sécurité a échoué.');
-return req.session.destroy((error) => {
-  if (error) return res.status(500).send('Impossible de fermer la session admin.');
-  res.clearCookie('panel.sid', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production' });
-  return res.redirect(303, '/admin/login');
-});
+<div class="role-note"><span class="role-note-icon" aria-hidden="true">ⓘ</span><div><strong>Accès réservé</strong><span>Ton compte doit être membre du serveur autorisé et posséder le rôle requis.</span></div></div>
+<p class="privacy-note">La connexion passe par Discord. Ton mot de passe Discord n’est jamais demandé par ce site.</p>
+</main></div></body></html>`);
 });
 
 app.get('/auth/discord', (req, res) => {
@@ -1497,19 +1260,9 @@ app.post('/api/command', async (req, res) => {
   try {
     if (BOT_SYNC_ONLY && name !== 'searchGifs' && name !== 'getServerOverview') {
       const result = await requestHostedBotCommand(name, args);
-      recordAdminActivity({
-        username: req.session.discord.username,
-        userId: req.session.discord.id,
-        action: `Action du panel : ${name}`,
-      });
       return res.json({ result });
     }
     const result = await executeCommand(name, args);
-    recordAdminActivity({
-      username: req.session.discord.username,
-      userId: req.session.discord.id,
-      action: `Action du panel : ${name}`,
-    });
     return res.json({ result });
   } catch (error) {
     recordActivity('error', `Erreur pendant « ${name} » : ${error.message}`);
