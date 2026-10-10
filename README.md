@@ -88,7 +88,7 @@ Le relais prend en charge les salons, messages, membres, modération, réglages,
 
 Dans **Commandes** du panel, tu peux créer des commandes slash personnalisées avec un nom, une description et une réponse en texte. Elles sont enregistrées directement sur le serveur Discord autorisé; les réponses sont publiques et les commandes peuvent être supprimées depuis la même page. Pour que cette fonction soit disponible, téléverse aussi la nouvelle version de `index-hosting-bot-panel-sync.js` sur hosting-bot.net et redémarre le bot après le déploiement Render.
 
-La nouvelle mascotte est aussi utilisée pour l’icône du site et de la PWA installable. Pour les utilisateurs de l’application de bureau Windows, `app-512.png` est l’icône de la fenêtre. Une PWA déjà installée peut nécessiter une nouvelle installation pour actualiser son icône.
+La nouvelle identité visuelle (logo et icônes 192/512 px) est utilisée sur le site, la PWA installable et l’application de bureau. La version de l’application de bureau est passée à `1.0.1`. Une PWA déjà installée peut nécessiter une nouvelle installation pour actualiser son icône.
 
 ### Installer le panel sur un téléphone
 

@@ -406,7 +406,7 @@ app.get('/login', (req, res) => {
   res.type('html').send(`<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121319"><link rel="manifest" href="/manifest.webmanifest">
-<link rel="icon" type="image/png" href="/icons/panel-192.png?v=2"><link rel="apple-touch-icon" href="/icons/panel-192.png?v=2"><link rel="stylesheet" href="/style.css?v=mobile-scroll-1">
+<link rel="icon" type="image/png" href="/icons/panel-192.png?v=3"><link rel="apple-touch-icon" href="/icons/panel-192.png?v=3"><link rel="stylesheet" href="/style.css?v=mobile-scroll-1">
 <script src="/pwa.js?v=slash-commands-2" defer></script>
 <title>Connexion Discord — Panel Bot</title><style>
 *{box-sizing:border-box}
@@ -475,7 +475,7 @@ body{display:block;padding:calc(24px + env(safe-area-inset-top)) 18px calc(28px 
 }
 </style></head><body><div class="login-layout">
 <section class="intro" aria-labelledby="welcome-title">
-<div class="brand"><span class="brand-mark" aria-hidden="true"><img src="/panel-icon.svg?v=2" alt=""></span><span>Panel Bot</span></div>
+<div class="brand"><span class="brand-mark" aria-hidden="true"><img src="/panel-icon.svg?v=3" alt=""></span><span>Panel Bot</span></div>
 <p class="eyebrow">Le contrôle de ton serveur, en un seul endroit</p>
 <h1 id="welcome-title">Ton serveur Discord, plus simple à gérer.</h1>
 <p class="lead">Un espace clair pour suivre ton bot et retrouver les outils essentiels sur ordinateur comme sur téléphone.</p>
