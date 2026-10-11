@@ -1,6 +1,7 @@
 @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600&display=swap');
 
 :root {
+  color-scheme: dark;
   --bg: #121319;
   --panel: #1a1c24;
   --panel-hi: #20222c;
@@ -1456,6 +1457,87 @@ button {
     padding-left: 8px;
     font-size: 12px;
   }
+}
+
+:root[data-theme="light"] {
+  color-scheme: light;
+  --bg: #f3f5fa;
+  --panel: #ffffff;
+  --panel-hi: #e9ecf4;
+  --border: #d8dce7;
+  --text: #202331;
+  --text-dim: #646b7b;
+  --accent: #5555d9;
+  --accent-soft: rgba(85, 85, 217, 0.12);
+  --danger: #d83b49;
+  --danger-soft: rgba(216, 59, 73, 0.1);
+  --success: #16864b;
+}
+
+:root[data-theme="light"] body {
+  background: var(--bg);
+}
+
+:root[data-theme="light"] .sidebar {
+  background: var(--panel);
+}
+
+:root[data-theme="light"] .status {
+  border-top-color: var(--border);
+}
+
+:root[data-theme="light"] .panel,
+:root[data-theme="light"] .dash-card,
+:root[data-theme="light"] .stat-card {
+  border-color: var(--border);
+  box-shadow: 0 8px 24px rgba(32, 35, 49, 0.06);
+}
+
+:root[data-theme="light"] .update-greeting {
+  border-color: var(--border);
+  background: var(--panel);
+  box-shadow: 0 20px 60px rgba(32, 35, 49, 0.2);
+}
+
+:root[data-theme="light"] .update-greeting::backdrop {
+  background: rgba(32, 35, 49, 0.38);
+}
+
+:root[data-theme="light"] .messages {
+  scrollbar-color: #c4c9d5 transparent;
+}
+
+.appearance-panel {
+  max-width: 480px;
+}
+
+.theme-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-top: 16px;
+}
+
+.theme-option {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  gap: 9px;
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  background: var(--panel-hi);
+  color: var(--text);
+}
+
+.theme-option[aria-pressed="true"] {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
+.theme-option-icon {
+  font-size: 16px;
+  line-height: 1;
 }
 
 @media (prefers-reduced-motion: reduce) {

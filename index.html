@@ -4,11 +4,20 @@
 <meta charset="UTF-8" />
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
 <meta name="theme-color" content="#121319" />
+<script>
+  try {
+    if (localStorage.getItem('panel-bot-theme') === 'light') {
+      document.documentElement.dataset.theme = 'light';
+    }
+  } catch (error) {
+    console.error('Impossible de charger le thème enregistré :', error);
+  }
+</script>
 <link rel="manifest" href="/manifest.webmanifest" />
 <link rel="icon" type="image/png" href="/icons/panel-192.png?v=3" />
 <link rel="apple-touch-icon" href="/icons/panel-192.png?v=3" />
 <title>Panel Bot Discord</title>
-<link rel="stylesheet" href="style.css?v=mobile-clean-1" />
+<link rel="stylesheet" href="style.css?v=light-dark-theme-1" />
 <script src="/pwa.js?v=slash-commands-2" defer></script>
 </head>
 <body>
@@ -317,8 +326,23 @@
       <section class="view" id="view-settings">
         <header class="view-header">
           <h1>Réglages</h1>
-          <p class="sub">Choisis le serveur et le salon cible du bot</p>
+          <p class="sub">Personnalise le panel et configure ton bot</p>
         </header>
+
+        <div class="panel appearance-panel">
+          <h2>Apparence</h2>
+          <p class="sub">Choisis le thème du panel sur cet appareil.</p>
+          <div class="theme-options" role="group" aria-label="Thème du panel">
+            <button class="theme-option" id="theme-light-btn" type="button" aria-pressed="false">
+              <span class="theme-option-icon" aria-hidden="true">☀️</span>
+              Mode clair
+            </button>
+            <button class="theme-option" id="theme-dark-btn" type="button" aria-pressed="true">
+              <span class="theme-option-icon" aria-hidden="true">🌙</span>
+              Mode sombre
+            </button>
+          </div>
+        </div>
 
         <div class="panel">
           <p class="hint" id="settings-mode-note" hidden></p>
@@ -375,6 +399,6 @@
   </dialog>
 
   <script src="web-bridge.js?v=usage-logs-1"></script>
-  <script src="renderer.js?v=custom-gif-display-1"></script>
+  <script src="renderer.js?v=light-dark-theme-1"></script>
 </body>
 </html>

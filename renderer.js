@@ -60,6 +60,37 @@ welcomeRobotAfterUpdate();
 
 const navItems = document.querySelectorAll('.nav-item');
 const views = document.querySelectorAll('.view');
+const lightThemeButton = document.getElementById('theme-light-btn');
+const darkThemeButton = document.getElementById('theme-dark-btn');
+
+function setTheme(theme) {
+  const selectedTheme = theme === 'light' ? 'light' : 'dark';
+  document.documentElement.dataset.theme = selectedTheme;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute(
+    'content',
+    selectedTheme === 'light' ? '#f3f5fa' : '#121319'
+  );
+  lightThemeButton?.setAttribute('aria-pressed', String(selectedTheme === 'light'));
+  darkThemeButton?.setAttribute('aria-pressed', String(selectedTheme === 'dark'));
+
+  try {
+    localStorage.setItem('panel-bot-theme', selectedTheme);
+  } catch (error) {
+    console.error('Impossible d’enregistrer le thème choisi :', error);
+  }
+}
+
+let savedTheme = 'dark';
+try {
+  const storedTheme = localStorage.getItem('panel-bot-theme');
+  if (storedTheme === 'light' || storedTheme === 'dark') savedTheme = storedTheme;
+} catch (error) {
+  console.error('Impossible de lire le thème enregistré :', error);
+}
+setTheme(savedTheme);
+lightThemeButton?.addEventListener('click', () => setTheme('light'));
+darkThemeButton?.addEventListener('click', () => setTheme('dark'));
+
 if (window.location.protocol === 'file:') {
   document.querySelector('.session-user')?.setAttribute('hidden', '');
 }

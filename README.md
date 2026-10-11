@@ -42,7 +42,9 @@ Au premier lancement, va dans **Réglages** pour choisir le serveur et le salon 
 
 Dans le chat, tape `@` puis quelques lettres pour rechercher un membre du serveur. Choisis-le dans la liste avec la souris ou les flèches du clavier et Entrée : sa mention Discord est insérée dans le message.
 
-Le bouton 😊 du chat ouvre les emojis courants et ceux du serveur Discord. La recherche filtre les emojis et cliquer sur l’un d’eux l’insère à l’emplacement du curseur. Les emojis personnalisés reçus dans le chat et les messages de bots s’affichent aussi comme des images, y compris les emojis animés. Les GIF partagés par lien ou en pièce jointe Discord s’affichent directement dans le chat et les messages de bots.
+Dans **Réglages > Apparence**, choisis le mode clair ou sombre. Le choix est mémorisé sur l'appareil utilisé.
+
+Le bouton 😊 du chat ouvre les emojis courants et ceux du serveur Discord. La recherche filtre les emojis et cliquer sur l'un d'eux l'insère à l'emplacement du curseur. Les emojis personnalisés reçus dans le chat et les messages de bots s'affichent aussi comme des images, y compris les emojis animés. Les GIF partagés par lien ou en pièce jointe Discord s'affichent directement dans le chat et les messages de bots.
 
 La catégorie **Serveurs** affiche les serveurs où le bot se trouve. Le bouton **Quitter tous les autres serveurs** affiche une confirmation, puis retire le bot de tous les serveurs sauf `1508431497433190420`. Si le serveur à conserver n’est pas trouvé, aucun serveur ne sera quitté. Une nouvelle invitation sur un autre serveur sera aussi refusée automatiquement.
 
@@ -52,7 +54,7 @@ Dans **Réglages > Accueil automatique**, active la fonctionnalité, choisis le 
 
 ## 4. Installer sur Mac (Intel et Apple Silicon)
 
-Les fichiers Mac sont compilés automatiquement sur GitHub Actions à chaque mise à jour de la branche `main`. Ouvre l’onglet **Actions**, sélectionne **Build macOS app**, puis télécharge l’artefact **Discord-Bot-App-macOS** du dernier succès. Il contient les installateurs `.dmg` et `.zip` Intel (`x64`) et Apple Silicon (`arm64`). La compilation peut aussi être lancée manuellement avec **Run workflow**.
+Les fichiers Mac sont compilés automatiquement sur GitHub Actions à chaque mise à jour de la branche `main`. Les versions publiées sont disponibles dans les [téléchargements Mac](https://github.com/vffb82464-create/bot-app-downloads/releases/latest) sous forme d'une archive ZIP contenant les DMG Intel (`x64`) et Apple Silicon (`arm64`). Le dépôt du code source reste privé. La compilation peut aussi être lancée manuellement avec **Run workflow** dans **Actions > Build macOS app**.
 
 Pour créer les installateurs manuellement, utilise un Mac avec Node.js 18 ou plus récent. Génère d’abord l’icône macOS à partir de l’image du projet, puis lance la compilation :
 
@@ -62,7 +64,7 @@ npm run icon:mac
 npm run dist:mac
 ```
 
-Les fichiers `.dmg` et `.zip` sont créés dans `dist/`, en versions Intel (`x64`) et Apple Silicon (`arm64`). Ouvre le `.dmg`, puis glisse **Discord Bot App** dans **Applications**. La première ouverture peut demander une confirmation dans **Réglages Système > Confidentialité et sécurité**, car l'application n'est pas signée ni notariée.
+Les fichiers `.dmg` et `.zip` sont créés dans `dist/`, en versions Intel (`x64`) et Apple Silicon (`arm64`). Ouvre le `.dmg`, puis glisse **Discord Bot App** dans **Applications**. L'application n'étant pas signée ni notariée par Apple, macOS peut bloquer son ouverture. Après avoir vérifié la provenance du téléchargement, ouvre **Réglages Système > Confidentialité et sécurité** et autorise son ouverture. Une autre possibilité pour une personne qui fait confiance à l'application est de retirer son attribut de quarantaine avec `sudo xattr -r -d com.apple.quarantine "/Applications/Discord Bot App.app"` dans Terminal.
 
 La version Mac minimale visée est macOS Catalina 10.15 sur Intel. Sur Apple Silicon, macOS 11 Big Sur ou plus récent est nécessaire. Les versions antérieures à ces limites ne sont pas prises en charge par Electron. Attention : Electron 32 est conservé pour cette compatibilité avec Catalina, mais ne reçoit plus de correctifs de sécurité. Pour un bot sensible, préfère une version récente de macOS et d'Electron.
 
