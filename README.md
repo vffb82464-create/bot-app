@@ -42,7 +42,7 @@ Au premier lancement, va dans **Réglages** pour choisir le serveur et le salon 
 
 Dans le chat, tape `@` puis quelques lettres pour rechercher un membre du serveur. Choisis-le dans la liste avec la souris ou les flèches du clavier et Entrée : sa mention Discord est insérée dans le message.
 
-Le bouton 😊 du chat ouvre les emojis courants et ceux du serveur Discord. La recherche filtre les emojis et cliquer sur l’un d’eux l’insère à l’emplacement du curseur. Les emojis personnalisés reçus dans le chat et les messages de bots s’affichent aussi comme des images, y compris les emojis animés.
+Le bouton 😊 du chat ouvre les emojis courants et ceux du serveur Discord. La recherche filtre les emojis et cliquer sur l’un d’eux l’insère à l’emplacement du curseur. Les emojis personnalisés reçus dans le chat et les messages de bots s’affichent aussi comme des images, y compris les emojis animés. Les GIF partagés par lien ou en pièce jointe Discord s’affichent directement dans le chat et les messages de bots.
 
 La catégorie **Serveurs** affiche les serveurs où le bot se trouve. Le bouton **Quitter tous les autres serveurs** affiche une confirmation, puis retire le bot de tous les serveurs sauf `1508431497433190420`. Si le serveur à conserver n’est pas trouvé, aucun serveur ne sera quitté. Une nouvelle invitation sur un autre serveur sera aussi refusée automatiquement.
 

@@ -392,28 +392,132 @@ function setReplyTarget(messageData) {
   updateReplyIndicator();
 }
 
-function appendDiscordContent(container, value) {
+function normalizeMessageUrl(value) {
+  const cleanValue = String(value || '').replace(/[.,!?;:)\]]+$/, '');
+  try {
+    return new URL(cleanValue).href;
+  } catch {
+    return '';
+  }
+}
+
+function isSupportedGifImageUrl(value) {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    const isMediaHost = hostname === 'cdn.discordapp.com'
+      || hostname.endsWith('.discordapp.net')
+      || hostname.endsWith('.giphy.com')
+      || hostname.endsWith('.tenor.com');
+    return url.protocol === 'https:' && isMediaHost
+      && url.pathname.toLowerCase().endsWith('.gif');
+  } catch {
+    return false;
+  }
+}
+
+function isSupportedGifVideoUrl(value) {
+  try {
+    const url = new URL(value);
+    const hostname = url.hostname.toLowerCase();
+    const isMediaHost = hostname === 'cdn.discordapp.com'
+      || hostname.endsWith('.discordapp.net')
+      || hostname.endsWith('.giphy.com')
+      || hostname.endsWith('.tenor.com');
+    return url.protocol === 'https:' && isMediaHost
+      && /\.(mp4|webm)$/i.test(url.pathname);
+  } catch {
+    return false;
+  }
+}
+
+function getRenderableMessageMedia(data) {
+  const media = [];
+  const seenUrls = new Set();
+  const addMedia = (item) => {
+    if (!item || typeof item.url !== 'string') return;
+    const type = item.type === 'video' ? 'video' : 'image';
+    const isSupported = type === 'video'
+      ? isSupportedGifVideoUrl(item.url)
+      : isSupportedGifImageUrl(item.url);
+    if (!isSupported || seenUrls.has(item.url)) return;
+    seenUrls.add(item.url);
+    media.push({
+      type,
+      url: item.url,
+      alt: typeof item.alt === 'string' ? item.alt : 'GIF',
+      sourceUrl: item.sourceUrl,
+    });
+  };
+
+  if (Array.isArray(data.media)) data.media.forEach(addMedia);
+  const directGifPattern = /https:\/\/[^\s<>]+/gi;
+  for (const match of String(data.content || '').matchAll(directGifPattern)) {
+    const url = normalizeMessageUrl(match[0]);
+    if (url && isSupportedGifImageUrl(url)) addMedia({ type: 'image', url, alt: 'GIF' });
+  }
+  return media;
+}
+
+function appendDiscordContent(container, value, media = []) {
   const text = String(value ?? '');
-  const customEmojiPattern = /<(a?):([a-zA-Z0-9_]{2,32}):(\d{17,20})>/g;
+  const messageTokenPattern = /<(a?):([a-zA-Z0-9_]{2,32}):(\d{17,20})>|https:\/\/[^\s<>]+/gi;
+  const mediaSourceUrls = new Set(
+    media.flatMap((item) => [normalizeMessageUrl(item.url), normalizeMessageUrl(item.sourceUrl)])
+      .filter(Boolean)
+  );
   let lastIndex = 0;
   let match;
 
-  while ((match = customEmojiPattern.exec(text)) !== null) {
+  while ((match = messageTokenPattern.exec(text)) !== null) {
     container.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
 
-    const [, animated, name, id] = match;
-    const emoji = document.createElement('img');
-    emoji.className = 'discord-emoji';
-    emoji.src = `https://cdn.discordapp.com/emojis/${id}.${animated ? 'gif' : 'png'}?size=48`;
-    emoji.alt = `:${name}:`;
-    emoji.title = `:${name}:`;
-    emoji.loading = 'lazy';
-    emoji.draggable = false;
-    container.appendChild(emoji);
-    lastIndex = customEmojiPattern.lastIndex;
+    if (match[0].startsWith('<')) {
+      const [, animated, name, id] = match;
+      const emoji = document.createElement('img');
+      emoji.className = 'discord-emoji';
+      emoji.src = `https://cdn.discordapp.com/emojis/${id}.${animated ? 'gif' : 'png'}?size=48`;
+      emoji.alt = `:${name}:`;
+      emoji.title = `:${name}:`;
+      emoji.loading = 'lazy';
+      emoji.draggable = false;
+      container.appendChild(emoji);
+    } else {
+      const sourceUrl = normalizeMessageUrl(match[0]);
+      const isGifLink = sourceUrl && isSupportedGifImageUrl(sourceUrl);
+      if (!isGifLink && !mediaSourceUrls.has(sourceUrl)) {
+        container.appendChild(document.createTextNode(match[0]));
+      }
+    }
+    lastIndex = messageTokenPattern.lastIndex;
   }
 
   container.appendChild(document.createTextNode(text.slice(lastIndex)));
+}
+
+function appendMessageMedia(container, media) {
+  if (!media.length) return;
+  const mediaContainer = document.createElement('div');
+  mediaContainer.className = 'discord-message-media';
+  media.forEach((item) => {
+    const element = item.type === 'video'
+      ? document.createElement('video')
+      : document.createElement('img');
+    element.className = 'discord-gif';
+    element.src = item.url;
+    element.alt = item.alt;
+    element.loading = 'lazy';
+    element.draggable = false;
+    if (item.type === 'video') {
+      element.autoplay = true;
+      element.loop = true;
+      element.muted = true;
+      element.playsInline = true;
+    }
+    element.addEventListener('error', () => element.remove(), { once: true });
+    mediaContainer.appendChild(element);
+  });
+  container.appendChild(mediaContainer);
 }
 
 function renderMessage(data) {
@@ -440,7 +544,9 @@ function renderMessage(data) {
 
   const content = document.createElement('div');
   content.className = 'msg-content';
-  appendDiscordContent(content, data.content);
+  const media = getRenderableMessageMedia(data);
+  appendDiscordContent(content, data.content, media);
+  appendMessageMedia(content, media);
   body.appendChild(content);
 
   wrap.appendChild(body);
@@ -715,7 +821,9 @@ function renderBotFeed(items) {
 
     const content = document.createElement('div');
     content.className = 'bot-item-content';
-    appendDiscordContent(content, item.content);
+    const media = getRenderableMessageMedia(item);
+    appendDiscordContent(content, item.content, media);
+    appendMessageMedia(content, media);
 
     card.append(top, meta, content);
     fragment.appendChild(card);

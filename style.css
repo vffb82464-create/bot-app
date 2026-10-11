@@ -350,6 +350,22 @@ body {
   vertical-align: -0.3em;
 }
 
+.discord-message-media {
+  display: grid;
+  justify-items: start;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.discord-gif {
+  display: block;
+  width: auto;
+  max-width: min(100%, 360px);
+  max-height: 320px;
+  border-radius: 8px;
+  object-fit: contain;
+}
+
 .empty-hint {
   color: var(--text-dim);
   font-size: 13px;
@@ -1163,6 +1179,11 @@ button {
   font-size: 13px;
   line-height: 1.5;
   white-space: pre-wrap;
+}
+
+.bot-item-content .discord-gif {
+  max-width: min(100%, 320px);
+  max-height: 260px;
 }
 
 .wide-panel {

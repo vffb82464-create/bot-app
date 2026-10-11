@@ -274,6 +274,32 @@ client.on('error', (err) => {
   mainWindow?.webContents.send('bot-status', { connected: false, error: err.message });
 });
 
+function getMessageMedia(message) {
+  const media = [];
+  for (const attachment of message.attachments.values()) {
+    if (
+      attachment.contentType?.toLowerCase().includes('image/gif')
+      || attachment.name?.toLowerCase().endsWith('.gif')
+      || /\.gif(?:$|[?#])/i.test(attachment.url)
+    ) {
+      media.push({ type: 'image', url: attachment.url, alt: attachment.name || 'GIF' });
+    }
+  }
+
+  for (const embed of message.embeds) {
+    const sourceUrl = embed.url || '';
+    if (embed.video?.url) {
+      media.push({ type: 'video', url: embed.video.url, sourceUrl, alt: embed.title || 'GIF' });
+    }
+    for (const image of [embed.image, embed.thumbnail]) {
+      if (image?.url) {
+        media.push({ type: 'image', url: image.url, sourceUrl, alt: embed.title || 'GIF' });
+      }
+    }
+  }
+  return media;
+}
+
 client.on('interactionCreate', async (interaction) => {
   if (!interaction.isChatInputCommand()) return;
   const command = slashCommands.find((entry) => entry.name === interaction.commandName);
@@ -306,6 +332,7 @@ client.on('messageCreate', (message) => {
         tag: message.author.tag,
         avatar: message.author.displayAvatarURL({ size: 64 }),
         content: message.content,
+        media: getMessageMedia(message),
         channel: message.channel?.name || 'Salon',
         channelId: message.channelId,
         timestamp: message.createdTimestamp,
@@ -321,6 +348,7 @@ client.on('messageCreate', (message) => {
     author: message.author.username,
     avatar: message.author.displayAvatarURL({ size: 64 }),
     content: message.content,
+    media: getMessageMedia(message),
     timestamp: message.createdTimestamp,
   });
 });
