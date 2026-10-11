@@ -1,7 +1,7 @@
 {
   "name": "discord-bot-app",
   "productName": "Discord Bot App",
-  "version": "1.0.2",
+  "version": "1.0.3",
   "description": "Application de bureau connectée à ton bot Discord",
   "main": "main.js",
   "scripts": {

@@ -342,6 +342,14 @@ body {
   word-wrap: break-word;
 }
 
+.discord-emoji {
+  width: 1.375em;
+  height: 1.375em;
+  margin: 0 0.08em;
+  object-fit: contain;
+  vertical-align: -0.3em;
+}
+
 .empty-hint {
   color: var(--text-dim);
   font-size: 13px;

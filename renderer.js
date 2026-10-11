@@ -392,6 +392,30 @@ function setReplyTarget(messageData) {
   updateReplyIndicator();
 }
 
+function appendDiscordContent(container, value) {
+  const text = String(value ?? '');
+  const customEmojiPattern = /<(a?):([a-zA-Z0-9_]{2,32}):(\d{17,20})>/g;
+  let lastIndex = 0;
+  let match;
+
+  while ((match = customEmojiPattern.exec(text)) !== null) {
+    container.appendChild(document.createTextNode(text.slice(lastIndex, match.index)));
+
+    const [, animated, name, id] = match;
+    const emoji = document.createElement('img');
+    emoji.className = 'discord-emoji';
+    emoji.src = `https://cdn.discordapp.com/emojis/${id}.${animated ? 'gif' : 'png'}?size=48`;
+    emoji.alt = `:${name}:`;
+    emoji.title = `:${name}:`;
+    emoji.loading = 'lazy';
+    emoji.draggable = false;
+    container.appendChild(emoji);
+    lastIndex = customEmojiPattern.lastIndex;
+  }
+
+  container.appendChild(document.createTextNode(text.slice(lastIndex)));
+}
+
 function renderMessage(data) {
   if (messagesEl.querySelector('.empty-hint')) messagesEl.innerHTML = '';
   const wrap = document.createElement('div');
@@ -416,7 +440,7 @@ function renderMessage(data) {
 
   const content = document.createElement('div');
   content.className = 'msg-content';
-  content.textContent = data.content;
+  appendDiscordContent(content, data.content);
   body.appendChild(content);
 
   wrap.appendChild(body);
@@ -672,22 +696,31 @@ function renderBotFeed(items) {
     return;
   }
 
-  const html = items
-    .slice()
-    .reverse()
-    .map((item) => `
-      <div class="bot-item">
-        <div class="bot-item-top">
-      <strong>${escapeHtml(item.author)}</strong>
-      <span>${escapeHtml(item.tag)}</span>
-        </div>
-    <div class="bot-item-meta">#${escapeHtml(item.channel)} · ${escapeHtml(item.id)}</div>
-    <div class="bot-item-content">${escapeHtml(item.content)}</div>
-      </div>
-    `)
-    .join('');
+  const fragment = document.createDocumentFragment();
+  items.slice().reverse().forEach((item) => {
+    const card = document.createElement('div');
+    card.className = 'bot-item';
 
-  feed.innerHTML = html;
+    const top = document.createElement('div');
+    top.className = 'bot-item-top';
+    const author = document.createElement('strong');
+    author.textContent = item.author;
+    const tag = document.createElement('span');
+    tag.textContent = item.tag;
+    top.append(author, tag);
+
+    const meta = document.createElement('div');
+    meta.className = 'bot-item-meta';
+    meta.textContent = `#${item.channel} · ${item.id}`;
+
+    const content = document.createElement('div');
+    content.className = 'bot-item-content';
+    appendDiscordContent(content, item.content);
+
+    card.append(top, meta, content);
+    fragment.appendChild(card);
+  });
+  feed.replaceChildren(fragment);
 }
 
 const botMessageBuffer = [];
