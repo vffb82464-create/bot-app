@@ -152,9 +152,13 @@ async function loadSlashCommands() {
         <div class="slash-command-copy">
           <strong>/${escapeHtml(command.name)}</strong>
           <p>${escapeHtml(command.description)}</p>
-          <small>${escapeHtml(command.response)}</small>
+          ${command.response
+    ? `<small>${escapeHtml(command.response)}</small>`
+    : '<small>Les détails de cette commande ne sont pas enregistrés sur cette installation.</small>'}
         </div>
-        <button class="btn-danger slash-command-delete" type="button" data-command-name="${escapeHtml(command.name)}">Supprimer</button>
+        ${command.managed === true || (command.managed === undefined && command.response)
+    ? `<button class="btn-danger slash-command-delete" type="button" data-command-name="${escapeHtml(command.name)}">Supprimer</button>`
+    : ''}
       </article>
     `).join('');
 

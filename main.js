@@ -470,9 +470,28 @@ ipcMain.handle('leave-other-servers', async () => {
 });
 
 ipcMain.handle('get-activity-logs', () => activityLogs);
-ipcMain.handle('get-slash-commands', () => (
-  slashCommands.map(({ name, description, response }) => ({ name, description, response }))
-));
+ipcMain.handle('get-slash-commands', async () => {
+  if (!client.isReady() || !client.user) {
+    throw new Error('Le bot doit être connecté pour charger les commandes slash.');
+  }
+
+  const rest = new REST().setToken(process.env.DISCORD_TOKEN);
+  const route = Routes.applicationGuildCommands(client.user.id, ALLOWED_GUILD_ID);
+  const registeredCommands = await rest.get(route);
+  return registeredCommands
+    .filter((command) => command.type === 1 || command.type === undefined)
+    .map(({ id, name, description }) => {
+      const localCommand = slashCommands.find(
+        (command) => command.commandId === id || command.name === name
+      );
+      return {
+        name,
+        description,
+        response: localCommand?.response || '',
+        managed: Boolean(localCommand),
+      };
+    });
+});
 
 ipcMain.handle('create-slash-command', async (event, input = {}) => {
   const name = typeof input.name === 'string' ? input.name.trim() : '';
