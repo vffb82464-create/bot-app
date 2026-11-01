@@ -294,6 +294,28 @@ body {
   margin: 0;
 }
 
+.chat-destination {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr);
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.chat-destination label {
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
+.chat-destination select {
+  width: 100%;
+  margin-top: 5px;
+}
+
+.chat-destination select:disabled {
+  opacity: 0.65;
+}
+
 /* ---------- Chat ---------- */
 
 .messages {
@@ -783,6 +805,93 @@ button {
   font-size: 12px;
 }
 
+.slash-command-options {
+  display: grid;
+  gap: 10px;
+  min-width: 0;
+  margin: 12px 0 4px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.slash-command-options legend {
+  padding: 0 5px;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.slash-command-options-list {
+  display: grid;
+  gap: 10px;
+}
+
+.slash-command-option-editor {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  background: var(--panel);
+}
+
+.slash-command-option-editor label {
+  display: grid;
+  min-width: 0;
+  gap: 4px;
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 11px;
+}
+
+.slash-command-option-editor input,
+.slash-command-option-editor select {
+  width: 100%;
+  min-width: 0;
+  margin: 0;
+}
+
+.slash-command-option-controls {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  grid-column: 1 / -1;
+}
+
+.slash-command-option-required,
+.slash-ephemeral-toggle {
+  display: flex !important;
+  align-items: center;
+  gap: 8px;
+  margin: 0 !important;
+  color: var(--text) !important;
+  font-size: 12px !important;
+  font-weight: 500 !important;
+}
+
+.slash-command-option-required input,
+.slash-ephemeral-toggle input {
+  width: 16px;
+  height: 16px;
+  flex: 0 0 auto;
+  margin: 0;
+  accent-color: var(--accent);
+}
+
+.slash-ephemeral-toggle {
+  padding: 10px 0;
+}
+
+.slash-command-option-summary {
+  display: block;
+  margin-top: 6px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+
 .slash-command-status {
   min-height: 20px;
   margin: 4px 0 0;
@@ -797,6 +906,24 @@ button {
 .slash-command-list {
   display: grid;
   gap: 10px;
+}
+
+.command-list-jump {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  margin-top: 10px;
+  padding: 0 12px;
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  font-size: 13px;
+  text-decoration: none;
+}
+
+.command-list-jump:hover {
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
 .slash-command-row {
@@ -2144,6 +2271,31 @@ a:focus-visible {
 
   .view {
     padding: 16px 14px;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+  }
+
+  #view-commands {
+    overflow-y: auto;
+    touch-action: pan-y;
+    -webkit-overflow-scrolling: touch;
+    overscroll-behavior-y: contain;
+  }
+
+  #view-commands > .panel:first-of-type { order: 1; }
+  #view-commands > .panel:last-of-type { order: 2; }
+
+  .command-list-jump {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .slash-command-option-editor {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .slash-command-option-controls {
+    grid-column: 1;
   }
 }
 
@@ -2155,6 +2307,11 @@ a:focus-visible {
 
   .nav {
     gap: 5px;
+  }
+
+  .chat-destination {
+    grid-template-columns: 1fr;
+    gap: 6px;
   }
 
   .nav-item {

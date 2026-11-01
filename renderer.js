@@ -131,6 +131,65 @@ navItems.forEach((btn) => {
 const slashCommandForm = document.getElementById('slash-command-form');
 const slashCommandList = document.getElementById('slash-command-list');
 const slashCommandStatus = document.getElementById('slash-command-status');
+const slashCommandOptionsList = document.getElementById('slash-command-options-list');
+const slashCommandAddOption = document.getElementById('slash-command-add-option');
+const slashOptionTypes = [
+  { value: 3, label: 'Texte' },
+  { value: 4, label: 'Nombre entier' },
+  { value: 10, label: 'Nombre décimal' },
+  { value: 5, label: 'Oui / non' },
+  { value: 6, label: 'Membre' },
+  { value: 7, label: 'Salon' },
+  { value: 8, label: 'Rôle' },
+  { value: 9, label: 'Membre ou rôle' },
+];
+const slashOptionDisplayLabels = {
+  template: 'Valeurs insérées par variables',
+  append: 'Valeurs ajoutées sous la réponse',
+  hidden: 'Valeurs non affichées',
+};
+
+function updateSlashOptionLimit() {
+  slashCommandAddOption.disabled = slashCommandOptionsList.children.length >= 25;
+}
+
+function addSlashCommandOption(option = {}) {
+  if (slashCommandOptionsList.children.length >= 25) return;
+  const row = document.createElement('div');
+  row.className = 'slash-command-option-editor';
+  row.innerHTML = `
+    <label>Nom (utilisé comme variable)
+      <input class="slash-option-name" type="text" maxlength="32" placeholder="pseudo" required />
+    </label>
+    <label>Type
+      <select class="slash-option-type">
+        ${slashOptionTypes.map((type) => `<option value="${type.value}">${type.label}</option>`).join('')}
+      </select>
+    </label>
+    <label>Description
+      <input class="slash-option-description" type="text" maxlength="100" placeholder="Le pseudo à afficher" required />
+    </label>
+    <div class="slash-command-option-controls">
+      <label class="slash-command-option-required">
+        <input class="slash-option-required" type="checkbox" />
+        Obligatoire
+      </label>
+      <button class="btn-danger slash-option-remove" type="button">Retirer</button>
+    </div>
+  `;
+  row.querySelector('.slash-option-name').value = option.name || '';
+  row.querySelector('.slash-option-description').value = option.description || '';
+  row.querySelector('.slash-option-type').value = String(option.type || 3);
+  row.querySelector('.slash-option-required').checked = option.required === true;
+  row.querySelector('.slash-option-remove').addEventListener('click', () => {
+    row.remove();
+    updateSlashOptionLimit();
+  });
+  slashCommandOptionsList.append(row);
+  updateSlashOptionLimit();
+}
+
+slashCommandAddOption.addEventListener('click', () => addSlashCommandOption());
 
 function setSlashCommandStatus(message, isError = false) {
   slashCommandStatus.textContent = message;
@@ -155,6 +214,13 @@ async function loadSlashCommands() {
           ${command.response
     ? `<small>${escapeHtml(command.response)}</small>`
     : '<small>Les détails de cette commande ne sont pas enregistrés sur cette installation.</small>'}
+          ${Array.isArray(command.options) && command.options.length
+    ? `<small class="slash-command-option-summary">Options : ${command.options.map((option) => `${escapeHtml(option.name)}${option.required ? ' (obligatoire)' : ''}`).join(', ')}</small>`
+    : ''}
+          ${command.ephemeral ? '<small class="slash-command-option-summary">Réponse éphémère</small>' : ''}
+          ${command.options?.length
+    ? `<small class="slash-command-option-summary">${escapeHtml(slashOptionDisplayLabels[command.optionDisplay] || slashOptionDisplayLabels.template)}</small>`
+    : ''}
         </div>
         ${command.managed === true || (command.managed === undefined && command.response)
     ? `<button class="btn-danger slash-command-delete" type="button" data-command-name="${escapeHtml(command.name)}">Supprimer</button>`
@@ -190,12 +256,31 @@ slashCommandForm.addEventListener('submit', async (event) => {
     name: slashCommandForm.elements.name.value.trim(),
     description: slashCommandForm.elements.description.value.trim(),
     response: slashCommandForm.elements.response.value.trim(),
+    options: [...slashCommandOptionsList.querySelectorAll('.slash-command-option-editor')].map((row) => ({
+      name: row.querySelector('.slash-option-name').value.trim(),
+      description: row.querySelector('.slash-option-description').value.trim(),
+      type: Number(row.querySelector('.slash-option-type').value),
+      required: row.querySelector('.slash-option-required').checked,
+    })),
+    ephemeral: slashCommandForm.elements.ephemeral.checked,
+    optionDisplay: slashCommandForm.elements.optionDisplay.value,
   };
+  const optionNames = input.options.map((option) => option.name);
+  if (input.options.some((option) => !/^[a-z0-9_-]{1,32}$/.test(option.name))) {
+    setSlashCommandStatus('Chaque nom d’option doit utiliser 1 à 32 lettres minuscules, chiffres, tirets ou tirets bas.', true);
+    return;
+  }
+  if (new Set(optionNames).size !== optionNames.length) {
+    setSlashCommandStatus('Chaque option doit avoir un nom différent.', true);
+    return;
+  }
   submitButton.disabled = true;
   setSlashCommandStatus('Création et synchronisation de la commande avec Discord…');
   try {
     await window.api.createSlashCommand(input);
     slashCommandForm.reset();
+    slashCommandOptionsList.replaceChildren();
+    updateSlashOptionLimit();
     setSlashCommandStatus(`La commande /${input.name} est disponible dans Discord.`);
     await loadSlashCommands();
   } catch (error) {
@@ -264,6 +349,7 @@ const gifResults = document.getElementById('gif-results');
 const memberSearch = document.getElementById('member-search');
 const botSearch = document.getElementById('bot-search');
 let currentChannelId = null;
+let chatChannelLoadId = 0;
 let replyTarget = null;
 let allMembers = [];
 let memberDirectoryMembers = null;
@@ -771,16 +857,39 @@ gifSearchForm.addEventListener('submit', async (event) => {
   event.preventDefault();
   const query = gifQuery.value.trim();
   if (!query) {
-    gifSearchStatus.textContent = 'Entre un mot pour chercher un GIF.';
+    gifSearchStatus.textContent = 'Entre un mot pour chercher un GIF ou colle un lien direct GIPHY.';
     gifResults.replaceChildren();
     return;
   }
 
   const searchButton = gifSearchForm.querySelector('button[type="submit"]');
   searchButton.disabled = true;
-  gifSearchStatus.textContent = 'Recherche des GIFs…';
   gifResults.replaceChildren();
   try {
+    let directGifUrl;
+    try {
+      const parsedUrl = new URL(query);
+      if (parsedUrl.protocol === 'https:'
+        && (parsedUrl.hostname === 'giphy.com' || parsedUrl.hostname.endsWith('.giphy.com'))) {
+        if (!/\.gif$/i.test(parsedUrl.pathname)) {
+          throw new Error('Colle le lien direct du GIF, qui se termine par .gif, et non la page GIPHY.');
+        }
+        directGifUrl = parsedUrl.toString();
+      }
+    } catch (error) {
+      if (error instanceof Error && error.message.startsWith('Colle le lien direct')) throw error;
+    }
+
+    if (directGifUrl) {
+      if (!currentChannelId) throw new Error('Choisis d’abord un salon dans Réglages.');
+      gifSearchStatus.textContent = 'Envoi du GIF…';
+      await window.api.sendGif({ channelId: currentChannelId, url: directGifUrl });
+      gifSearchStatus.textContent = 'GIF envoyé dans le salon Discord ✅';
+      return;
+    }
+
+    if (query.length > 100) throw new Error('La recherche ne peut pas dépasser 100 caractères.');
+    gifSearchStatus.textContent = 'Recherche des GIFs…';
     const gifs = await window.api.searchGifs(query);
     if (!gifs.length) {
       gifSearchStatus.textContent = 'Aucun GIF trouvé pour cette recherche.';
@@ -796,6 +905,10 @@ gifSearchForm.addEventListener('submit', async (event) => {
       preview.src = gif.previewUrl;
       preview.alt = gif.title;
       preview.loading = 'lazy';
+      preview.addEventListener('error', () => {
+        preview.alt = 'Aperçu indisponible';
+        preview.classList.add('gif-preview-error');
+      }, { once: true });
       card.appendChild(preview);
 
       const sendButton = document.createElement('button');
@@ -878,7 +991,7 @@ composer.addEventListener('submit', async (e) => {
   const content = messageInput.value.trim();
   if (!content) return;
   if (!currentChannelId) {
-    renderMessage({ author: 'Erreur', avatar: '', content: 'Choisis un salon dans Réglages avant d’envoyer un message.' });
+    renderMessage({ author: 'Erreur', avatar: '', content: 'Choisis un serveur et un salon où le bot peut écrire.' });
     return;
   }
 
@@ -956,6 +1069,92 @@ async function loadSettings() {
   guildSelect.onchange = () => populateChannels(guildSelect.value);
 }
 
+const chatGuildSelect = document.getElementById('chat-guild-select');
+const chatChannelSelect = document.getElementById('chat-channel-select');
+const chatTargetLabel = document.getElementById('chat-target-label');
+
+async function populateChatChannels(guildId, preferredChannelId = '') {
+  const loadId = ++chatChannelLoadId;
+  currentChannelId = null;
+  chatChannelSelect.disabled = true;
+  chatChannelSelect.replaceChildren(createOption('Chargement des salons…', ''));
+  if (!guildId) {
+    chatChannelSelect.replaceChildren(createOption('Aucun serveur disponible', ''));
+    chatTargetLabel.textContent = 'Le bot n’est présent sur aucun serveur.';
+    return;
+  }
+
+  const guildName = chatGuildSelect.selectedOptions[0]?.textContent || 'Serveur';
+  chatTargetLabel.textContent = `Chargement des salons de ${guildName}…`;
+  try {
+    const channels = await window.api.getMessageChannels(guildId);
+    if (loadId !== chatChannelLoadId || chatGuildSelect.value !== guildId) return;
+    chatChannelSelect.replaceChildren(
+      ...(channels.length
+        ? channels.map((channel) => createOption(`#${channel.name}`, channel.id))
+        : [createOption('Aucun salon accessible en écriture', '')])
+    );
+    if (channels.some((channel) => channel.id === preferredChannelId)) {
+      chatChannelSelect.value = preferredChannelId;
+    }
+    currentChannelId = chatChannelSelect.value || null;
+    chatChannelSelect.disabled = channels.length === 0;
+    chatTargetLabel.textContent = currentChannelId
+      ? `Destination : ${guildName} · ${chatChannelSelect.selectedOptions[0].textContent}`
+      : `Aucun salon accessible où le bot peut écrire sur ${guildName}.`;
+  } catch (error) {
+    if (loadId !== chatChannelLoadId || chatGuildSelect.value !== guildId) return;
+    chatChannelSelect.replaceChildren(createOption('Impossible de charger les salons', ''));
+    chatTargetLabel.textContent = `Erreur de chargement des salons : ${error.message}`;
+    console.error('Impossible de charger les salons de destination :', error);
+  }
+}
+
+async function loadChatDestinations(preferredGuildId, preferredChannelId) {
+  chatGuildSelect.disabled = true;
+  chatChannelSelect.disabled = true;
+  chatGuildSelect.replaceChildren(createOption('Chargement des serveurs…', ''));
+  try {
+    const guilds = await window.api.getMessageGuilds();
+    chatGuildSelect.replaceChildren(
+      ...(guilds.length
+        ? guilds.map((guild) => createOption(guild.name, guild.id))
+        : [createOption('Aucun serveur disponible', '')])
+    );
+    if (!guilds.length) {
+      chatTargetLabel.textContent = 'Le bot n’est présent sur aucun serveur.';
+      return;
+    }
+
+    const selectedGuildId = guilds.some((guild) => guild.id === preferredGuildId)
+      ? preferredGuildId
+      : guilds[0].id;
+    chatGuildSelect.value = selectedGuildId;
+    chatGuildSelect.disabled = false;
+    await populateChatChannels(selectedGuildId, selectedGuildId === preferredGuildId ? preferredChannelId : '');
+  } catch (error) {
+    chatGuildSelect.replaceChildren(createOption('Impossible de charger les serveurs', ''));
+    chatTargetLabel.textContent = `Erreur de chargement des serveurs : ${error.message}`;
+    console.error('Impossible de charger les serveurs de destination :', error);
+  }
+}
+
+chatGuildSelect.addEventListener('change', () => {
+  replyTarget = null;
+  updateReplyIndicator();
+  populateChatChannels(chatGuildSelect.value);
+});
+
+chatChannelSelect.addEventListener('change', () => {
+  currentChannelId = chatChannelSelect.value || null;
+  replyTarget = null;
+  updateReplyIndicator();
+  const guildName = chatGuildSelect.selectedOptions[0]?.textContent || 'Serveur';
+  chatTargetLabel.textContent = currentChannelId
+    ? `Destination : ${guildName} · ${chatChannelSelect.selectedOptions[0].textContent}`
+    : `Aucun salon accessible où le bot peut écrire sur ${guildName}.`;
+});
+
 async function populateChannels(guildId) {
   const channels = guildId ? await window.api.getChannels(guildId) : [];
   const channelSelect = document.getElementById('channel-select');
@@ -984,6 +1183,7 @@ document.getElementById('save-settings-btn').addEventListener('click', async () 
       welcomeMessage: document.getElementById('welcome-message').value,
     });
     currentChannelId = config.channelId;
+    await loadChatDestinations(guildId, config.channelId);
     if (mentionMembersGuildId !== guildId) {
       mentionMembersGuildId = null;
       mentionMembersPromise = null;
@@ -1523,14 +1723,29 @@ document.getElementById('leave-voice-btn')?.addEventListener('click', async () =
 });
 
 document.getElementById('set-status-btn')?.addEventListener('click', async () => {
-  const value = document.getElementById('bot-status-text').value.trim();
-  if (!value) return;
+  const textInput = document.getElementById('bot-status-text');
+  const button = document.getElementById('set-status-btn');
+  const statusMessage = document.getElementById('bot-presence-status-message');
+  const text = textInput.value.trim();
+  if (!text) {
+    statusMessage.textContent = 'Saisis le texte à afficher.';
+    textInput.focus();
+    return;
+  }
 
+  button.disabled = true;
+  statusMessage.textContent = 'Mise à jour du statut…';
   try {
-    await window.api.setBotStatus(value);
-    document.getElementById('bot-status-text').value = '';
-  } catch (err) {
-    document.getElementById('voice-status-label').textContent = `Erreur statut : ${err.message}`;
+    await window.api.setBotStatus({
+      text,
+      type: document.getElementById('bot-activity-type').value,
+      status: document.getElementById('bot-presence-status').value,
+    });
+    statusMessage.textContent = 'Le statut du bot a été mis à jour.';
+  } catch (error) {
+    statusMessage.textContent = `Erreur statut : ${error.message}`;
+  } finally {
+    button.disabled = false;
   }
 });
 
@@ -1585,13 +1800,16 @@ document.getElementById('stop-music-btn')?.addEventListener('click', async () =>
 // ---------- Démarrage ----------
 
 (async function init() {
-  const config = await window.api.getConfig();
-  currentChannelId = config.channelId || null;
-  if (currentChannelId) {
-    document.getElementById('chat-target-label').textContent = 'Salon connecté ✅';
-  } else {
-    messagesEl.innerHTML = '<p class="empty-hint">Va dans Réglages pour choisir un serveur et un salon.</p>';
+  try {
+    const config = await window.api.getConfig();
+    await loadChatDestinations(config.guildId, config.channelId);
+    if (!currentChannelId) {
+      messagesEl.innerHTML = '<p class="empty-hint">Choisis un serveur et un salon accessible où le bot peut écrire.</p>';
+    }
+    loadVoiceChannels();
+  } catch (error) {
+    chatTargetLabel.textContent = `Impossible de charger le panel : ${error.message}`;
+    messagesEl.innerHTML = `<p class="empty-hint">${escapeHtml(error.message)}</p>`;
+    console.error('Panel initialization failed:', error);
   }
-
-  loadVoiceChannels();
 })();

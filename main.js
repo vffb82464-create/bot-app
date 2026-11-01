@@ -15,8 +15,10 @@ const {
   GatewayIntentBits,
   EmbedBuilder,
   ActivityType,
+  PermissionFlagsBits,
   REST,
   Routes,
+  MessageFlags,
 } = require('discord.js');
 const {
   joinVoiceChannel,
@@ -42,6 +44,7 @@ const ACTIVITY_LOG_PATH = path.join(DATA_PATH, 'activity-logs.json');
 const SLASH_COMMANDS_PATH = path.join(DATA_PATH, 'slash-commands.json');
 const ALLOWED_GUILD_ID = '1508431497433190420';
 const MAX_ACTIVITY_LOGS = 200;
+const SLASH_OPTION_TYPES = new Set([3, 4, 5, 6, 7, 8, 9, 10]);
 const DEFAULT_CONFIG = {
   guildId: '',
   channelId: '',
@@ -147,6 +150,82 @@ let audioPlayer = null;
 let currentMusic = { title: '', playing: false };
 const guildsBeingRemoved = new Set();
 
+function normalizeSlashOptions(input) {
+  if (!Array.isArray(input) || input.length > 25) {
+    throw new Error('Une commande peut contenir au maximum 25 options.');
+  }
+  const names = new Set();
+  const options = input.map((option) => {
+    const name = typeof option?.name === 'string' ? option.name.trim() : '';
+    const description = typeof option?.description === 'string' ? option.description.trim() : '';
+    const type = Number(option?.type);
+    if (!/^[a-z0-9_-]{1,32}$/.test(name)) {
+      throw new Error('Le nom de chaque option doit contenir 1 à 32 caractères minuscules, chiffres, tirets ou tirets bas.');
+    }
+    if (names.has(name)) throw new Error(`Le nom d’option « ${name} » est utilisé plusieurs fois.`);
+    if (!description || description.length > 100) {
+      throw new Error(`La description de l’option « ${name} » doit contenir entre 1 et 100 caractères.`);
+    }
+    if (!SLASH_OPTION_TYPES.has(type)) throw new Error(`Le type de l’option « ${name} » est invalide.`);
+    names.add(name);
+    return { name, description, type, required: option.required === true };
+  });
+  return options.sort((left, right) => Number(right.required) - Number(left.required));
+}
+
+function normalizeSlashOptionDisplay(value) {
+  const display = value || 'template';
+  if (!['template', 'append', 'hidden'].includes(display)) {
+    throw new Error('Choisis un mode d’affichage valide pour les valeurs des options.');
+  }
+  return display;
+}
+
+function formatSlashCommandResponse(interaction, command) {
+  const values = new Map();
+  for (const option of command.options || []) {
+    let value;
+    switch (option.type) {
+      case 3: value = interaction.options.getString(option.name); break;
+      case 4: value = interaction.options.getInteger(option.name); break;
+      case 5: value = interaction.options.getBoolean(option.name); break;
+      case 6: {
+        const user = interaction.options.getUser(option.name);
+        value = user?.globalName || user?.username;
+        break;
+      }
+      case 7: {
+        const channel = interaction.options.getChannel(option.name);
+        value = channel?.name || (channel ? `<#${channel.id}>` : undefined);
+        break;
+      }
+      case 8: value = interaction.options.getRole(option.name)?.name; break;
+      case 9: {
+        const target = interaction.options.getMentionable(option.name);
+        value = target?.displayName || target?.globalName || target?.username || target?.name;
+        break;
+      }
+      case 10: value = interaction.options.getNumber(option.name); break;
+      default: value = undefined;
+    }
+    values.set(option.name, value === null || value === undefined ? '' : String(value));
+  }
+  const display = command.optionDisplay || 'template';
+  let response = command.response.replace(/\{([a-z0-9_-]{1,32})\}/g, (placeholder, name) => (
+    display === 'hidden' ? '' : values.get(name) ?? placeholder
+  ));
+  if (display === 'append') {
+    const submittedValues = [...values]
+      .filter(([, value]) => value !== '')
+      .map(([name, value]) => `${name} : ${value}`);
+    if (submittedValues.length) response += `\n\n${submittedValues.join('\n')}`;
+  }
+  if (response.length > 2000) {
+    throw new Error('La réponse avec les valeurs saisies dépasse la limite de 2 000 caractères.');
+  }
+  return response;
+}
+
 function loadActivityLogs() {
   try {
     const logs = JSON.parse(fs.readFileSync(ACTIVITY_LOG_PATH, 'utf-8'));
@@ -241,16 +320,6 @@ async function checkAllowedGuild() {
   return true;
 }
 
-client.on('guildCreate', (guild) => {
-  if (guild.id !== ALLOWED_GUILD_ID) {
-    recordActivity('warning', `Le bot a été ajouté à « ${guild.name} »; il va le quitter.`, {
-      guildId: guild.id,
-      guildName: guild.name,
-    });
-    void leaveUnapprovedGuild(guild);
-  }
-});
-
 client.once('ready', async () => {
   console.log(`Bot connecté en tant que ${client.user.tag}`);
   recordActivity('success', `Bot connecté en tant que ${client.user.tag}.`);
@@ -314,11 +383,22 @@ client.on('interactionCreate', async (interaction) => {
       return;
     }
     await interaction.reply({
-      content: command.response,
+      content: formatSlashCommandResponse(interaction, command),
       allowedMentions: { parse: [] },
+      ...(command.ephemeral ? { flags: MessageFlags.Ephemeral } : {}),
     });
   } catch (error) {
     recordActivity('error', `Impossible de répondre avec /${command.name} : ${error.message}`);
+    if (!interaction.replied && !interaction.deferred) {
+      try {
+        await interaction.reply({
+          content: error.message,
+          flags: MessageFlags.Ephemeral,
+        });
+      } catch (replyError) {
+        recordActivity('error', `Impossible de signaler l’erreur de /${command.name} : ${replyError.message}`);
+      }
+    }
   }
 });
 
@@ -470,6 +550,12 @@ ipcMain.handle('leave-other-servers', async () => {
 });
 
 ipcMain.handle('get-activity-logs', () => activityLogs);
+ipcMain.handle('get-warnings', (event, { guildId, userId }) => {
+  if (!guildId || !userId) throw new Error('Choisis un serveur et un membre pour consulter les avertissements.');
+  return loadWarnings()
+    .filter((warning) => warning.guildId === guildId && warning.userId === userId)
+    .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+});
 ipcMain.handle('get-slash-commands', async () => {
   if (!client.isReady() || !client.user) {
     throw new Error('Le bot doit être connecté pour charger les commandes slash.');
@@ -480,7 +566,7 @@ ipcMain.handle('get-slash-commands', async () => {
   const registeredCommands = await rest.get(route);
   return registeredCommands
     .filter((command) => command.type === 1 || command.type === undefined)
-    .map(({ id, name, description }) => {
+    .map(({ id, name, description, options }) => {
       const localCommand = slashCommands.find(
         (command) => command.commandId === id || command.name === name
       );
@@ -488,6 +574,9 @@ ipcMain.handle('get-slash-commands', async () => {
         name,
         description,
         response: localCommand?.response || '',
+        options: options || [],
+        ephemeral: localCommand?.ephemeral === true,
+        optionDisplay: localCommand?.optionDisplay || 'template',
         managed: Boolean(localCommand),
       };
     });
@@ -497,6 +586,9 @@ ipcMain.handle('create-slash-command', async (event, input = {}) => {
   const name = typeof input.name === 'string' ? input.name.trim() : '';
   const description = typeof input.description === 'string' ? input.description.trim() : '';
   const response = typeof input.response === 'string' ? input.response.trim() : '';
+  const options = normalizeSlashOptions(input.options || []);
+  const ephemeral = input.ephemeral === true;
+  const optionDisplay = normalizeSlashOptionDisplay(input.optionDisplay);
   if (!/^[a-z0-9_-]{1,32}$/.test(name)) {
     throw new Error('Le nom doit contenir 1 à 32 caractères minuscules, chiffres, tirets ou tirets bas.');
   }
@@ -524,13 +616,16 @@ ipcMain.handle('create-slash-command', async (event, input = {}) => {
   }
 
   const registered = await rest.post(route, {
-    body: { name, description, type: 1 },
+    body: { name, description, options, type: 1 },
   });
   const updatedCommands = [...slashCommands, {
     commandId: registered.id,
     name,
     description,
     response,
+    options,
+    ephemeral,
+    optionDisplay,
   }];
   try {
     saveSlashCommands(updatedCommands);
@@ -547,7 +642,7 @@ ipcMain.handle('create-slash-command', async (event, input = {}) => {
   }
   slashCommands = updatedCommands;
   recordActivity('info', `Commande slash /${name} créée.`, { guildId: ALLOWED_GUILD_ID });
-  return { name, description, response };
+  return { name, description, response, options, ephemeral, optionDisplay };
 });
 
 ipcMain.handle('delete-slash-command', async (event, name) => {
@@ -566,7 +661,7 @@ ipcMain.handle('delete-slash-command', async (event, name) => {
     saveSlashCommands(updatedCommands);
   } catch (error) {
     const restored = await rest.post(Routes.applicationGuildCommands(client.user.id, ALLOWED_GUILD_ID), {
-      body: { name: command.name, description: command.description, type: 1 },
+      body: { name: command.name, description: command.description, options: command.options || [], type: 1 },
     });
     const restoredCommands = slashCommands.map((entry) => (
       entry.name === name ? { ...entry, commandId: restored.id } : entry
@@ -642,6 +737,44 @@ ipcMain.handle('get-channels', async (event, guildId) => {
     .map((c) => ({ id: c.id, name: c.name }));
 });
 
+ipcMain.handle('get-message-guilds', () => client.guilds.cache
+  .map((guild) => ({ id: guild.id, name: guild.name }))
+  .sort((left, right) => left.name.localeCompare(right.name)));
+
+ipcMain.handle('get-message-channels', async (event, guildId) => {
+  const guild = client.guilds.cache.get(String(guildId || ''));
+  if (!guild) throw new Error('Le bot ne se trouve pas sur ce serveur.');
+  const channels = await guild.channels.fetch();
+  return channels
+    .filter((channel) => (
+      channel
+      && channel.isTextBased()
+      && !channel.isThread()
+      && channel.permissionsFor(client.user)?.has([
+        PermissionFlagsBits.ViewChannel,
+        PermissionFlagsBits.SendMessages,
+      ])
+    ))
+    .map((channel) => ({ id: channel.id, name: channel.name }));
+});
+
+async function fetchBotTextChannel(channelId) {
+  const channel = await client.channels.fetch(String(channelId || ''));
+  if (!channel || !channel.guildId || !channel.isTextBased() || channel.isThread()) {
+    throw new Error('Choisis un salon textuel valide.');
+  }
+  if (!client.guilds.cache.has(channel.guildId)) {
+    throw new Error('Le bot ne se trouve pas sur le serveur de ce salon.');
+  }
+  if (!channel.permissionsFor(client.user)?.has([
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+  ])) {
+    throw new Error('Le bot ne peut pas voir ou envoyer de messages dans ce salon.');
+  }
+  return channel;
+}
+
 ipcMain.handle('get-guild-emojis', async () => {
   const guild = await client.guilds.fetch(ALLOWED_GUILD_ID);
   const emojis = await guild.emojis.fetch();
@@ -707,18 +840,38 @@ ipcMain.handle('leave-voice', async (event, guildId) => {
   return { connected: false, guildId };
 });
 
-ipcMain.handle('set-bot-status', async (event, { text }) => {
+ipcMain.handle('set-bot-status', async (event, input) => {
   if (!client.user) {
     throw new Error('Bot non connecté');
   }
 
-  const statusText = text && text.trim() ? text.trim() : 'Panel Bot';
+  const text = typeof input?.text === 'string' ? input.text.trim() : '';
+  const activityTypes = {
+    playing: ActivityType.Playing,
+    listening: ActivityType.Listening,
+    watching: ActivityType.Watching,
+    competing: ActivityType.Competing,
+    custom: ActivityType.Custom,
+  };
+  const presenceStatuses = new Set(['online', 'idle', 'dnd', 'invisible']);
+  if (!text || text.length > 128) {
+    throw new Error('Le texte du statut doit contenir entre 1 et 128 caractères.');
+  }
+  if (!Object.hasOwn(activityTypes, input.type)) {
+    throw new Error('Choisis un type d’activité valide.');
+  }
+  if (!presenceStatuses.has(input.status)) {
+    throw new Error('Choisis un état de présence valide.');
+  }
+  const activity = input.type === 'custom'
+    ? { name: 'Custom Status', state: text, type: ActivityType.Custom }
+    : { name: text, type: activityTypes[input.type] };
   await client.user.setPresence({
-    activities: [{ name: statusText, type: ActivityType.Custom }],
-    status: 'online',
+    activities: [activity],
+    status: input.status,
   });
 
-  return { text: statusText };
+  return { text, type: input.type, status: input.status };
 });
 
 async function ensureGuildVoiceConnection(guildId, channelId) {
@@ -903,12 +1056,15 @@ ipcMain.handle('get-members', async (event, guildId) => fetchGuildMembers(guildI
 ipcMain.handle('get-bots', async (event, guildId) => fetchGuildMembers(guildId, true));
 
 ipcMain.handle('send-message', async (event, { channelId, content, replyToMessageId }) => {
-  const channel = await client.channels.fetch(channelId);
-  if (!channel || !channel.isTextBased()) throw new Error('Salon invalide');
+  const channel = await fetchBotTextChannel(channelId);
+  const message = typeof content === 'string' ? content.trim() : '';
+  if (!message || message.length > 2000) {
+    throw new Error('Le message doit contenir entre 1 et 2 000 caractères.');
+  }
 
   const payload = replyToMessageId
-    ? { content, reply: { messageReference: replyToMessageId } }
-    : content;
+    ? { content: message, reply: { messageReference: replyToMessageId } }
+    : message;
 
   await channel.send(payload);
   recordActivity('info', `Message envoyé dans #${channel.name || channelId}.`, {
@@ -922,6 +1078,17 @@ function isGiphyUrl(url) {
   return hostname === 'giphy.com' || hostname.endsWith('.giphy.com');
 }
 
+function isDirectGiphyGifUrl(url) {
+  try {
+    const parsedUrl = new URL(url);
+    return parsedUrl.protocol === 'https:'
+      && isGiphyUrl(parsedUrl.toString())
+      && /\.gif$/i.test(parsedUrl.pathname);
+  } catch {
+    return false;
+  }
+}
+
 ipcMain.handle('search-gifs', async (event, query) => {
   const searchTerm = typeof query === 'string' ? query.trim() : '';
   if (!searchTerm || searchTerm.length > 100) {
@@ -930,7 +1097,7 @@ ipcMain.handle('search-gifs', async (event, query) => {
 
   const apiKey = process.env.GIPHY_API_KEY;
   if (!apiKey) {
-    throw new Error('Configure GIPHY_API_KEY dans le fichier .env pour rechercher des GIFs.');
+    throw new Error('La recherche GIF nécessite GIPHY_API_KEY dans le fichier .env. Tu peux aussi coller un lien direct GIPHY se terminant par .gif.');
   }
 
   const searchUrl = new URL('https://api.giphy.com/v1/gifs/search');
@@ -988,14 +1155,12 @@ ipcMain.handle('send-gif', async (event, { channelId, url }) => {
     throw new Error('GIF invalide.');
   }
   if (
-    gifUrl.protocol !== 'https:'
-    || (gifUrl.hostname !== 'giphy.com' && !gifUrl.hostname.endsWith('.giphy.com'))
+    !isDirectGiphyGifUrl(gifUrl.toString())
   ) {
-    throw new Error('Seuls les GIFs provenant de GIPHY peuvent être envoyés.');
+    throw new Error('Colle un lien direct vers un fichier GIF GIPHY se terminant par .gif.');
   }
 
-  const channel = await client.channels.fetch(channelId);
-  if (!channel || !channel.isTextBased()) throw new Error('Salon invalide');
+  const channel = await fetchBotTextChannel(channelId);
 
   const embed = new EmbedBuilder()
     .setImage(gifUrl.toString())

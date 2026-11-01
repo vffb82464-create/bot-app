@@ -17,7 +17,7 @@
 <link rel="icon" type="image/png" href="/icons/panel-192.png?v=3" />
 <link rel="apple-touch-icon" href="/icons/panel-192.png?v=3" />
 <title>Panel Bot Discord</title>
-<link rel="stylesheet" href="style.css?v=light-dark-theme-1" />
+<link rel="stylesheet" href="style.css?v=gif-direct-link-1" />
 <script src="/pwa.js?v=slash-commands-2" defer></script>
 </head>
 <body>
@@ -77,6 +77,14 @@
           <h1>Chat</h1>
           <p class="sub" id="chat-target-label">Aucun salon sélectionné</p>
         </header>
+        <div class="chat-destination" aria-label="Destination des messages">
+          <label for="chat-guild-select">Serveur
+            <select id="chat-guild-select" disabled></select>
+          </label>
+          <label for="chat-channel-select">Salon
+            <select id="chat-channel-select" disabled></select>
+          </label>
+        </div>
         <div class="messages" id="messages"></div>
         <div class="reply-indicator hidden" id="reply-indicator">Réponse à : <span id="reply-target-name"></span></div>
         <div class="composer-wrap">
@@ -95,10 +103,11 @@
         </div>
         <section class="panel wide-panel gif-tools" id="gif-tools" aria-label="Recherche de GIF" hidden>
           <form class="gif-search-form" id="gif-search-form">
-            <input type="text" id="gif-query" maxlength="100" placeholder="Quel GIF cherches-tu ?" autocomplete="off" />
+            <input type="text" id="gif-query" maxlength="500" placeholder="Cherche un GIF ou colle un lien direct GIPHY (.gif)" autocomplete="off" />
             <button type="submit" class="btn-primary">Rechercher</button>
           </form>
           <p class="log" id="gif-search-status" role="status" aria-live="polite"></p>
+          <small class="hint">La recherche nécessite une clé GIPHY. Sans clé, colle un lien direct GIPHY se terminant par .gif pour l’envoyer.</small>
           <div class="gif-results" id="gif-results"></div>
           <p class="giphy-attribution">Powered by GIPHY</p>
         </section>
@@ -193,6 +202,7 @@
         <header class="view-header">
           <h1>Commandes</h1>
           <p class="sub">Les commandes publiées sont visibles par tous les membres du serveur et répertoriées ici pour tous les utilisateurs du panel.</p>
+          <a class="command-list-jump" href="#slash-command-list-panel">Voir les commandes créées ↓</a>
         </header>
 
         <div class="panel">
@@ -206,11 +216,28 @@
             <input id="slash-command-description" name="description" type="text" maxlength="100" placeholder="Affiche les règles du serveur" required />
             <label for="slash-command-response">Réponse du bot</label>
             <textarea id="slash-command-response" name="response" rows="4" maxlength="2000" placeholder="Bienvenue ! Voici les règles du serveur…" required></textarea>
+            <label for="slash-command-option-display">Affichage des valeurs saisies</label>
+            <select id="slash-command-option-display" name="optionDisplay">
+              <option value="template">Utiliser les variables dans ma réponse</option>
+              <option value="append">Ajouter toutes les valeurs sous la réponse</option>
+              <option value="hidden">Ne pas afficher les valeurs</option>
+            </select>
+            <small class="hint">En mode variables, écris par exemple « Bonjour {pseudo} » pour une option nommée pseudo.</small>
+            <fieldset class="slash-command-options">
+              <legend>Options demandées à l’utilisateur</legend>
+              <div id="slash-command-options-list" class="slash-command-options-list"></div>
+              <button class="btn-secondary" id="slash-command-add-option" type="button">Ajouter une option</button>
+              <small class="hint">Texte, nombres, oui/non, membre, salon ou rôle (25 maximum).</small>
+            </fieldset>
+            <label class="slash-ephemeral-toggle" for="slash-command-ephemeral">
+              <input id="slash-command-ephemeral" name="ephemeral" type="checkbox" />
+              Réponse éphémère (visible seulement par la personne qui lance la commande)
+            </label>
             <button class="btn-primary" type="submit">Créer la commande</button>
             <p class="slash-command-status" id="slash-command-status" role="status" aria-live="polite"></p>
           </form>
         </div>
-        <div class="panel">
+        <div class="panel" id="slash-command-list-panel">
           <h2>Commandes du serveur</h2>
           <div id="slash-command-list" class="slash-command-list" aria-live="polite">
             <p class="empty-hint">Chargement des commandes…</p>
@@ -267,6 +294,19 @@
           </div>
         </div>
 
+        <div class="panel wide-panel">
+          <div class="server-protection-heading">
+            <div>
+              <h2>Historique des avertissements</h2>
+              <p class="sub" id="warning-history-summary">Choisis un membre pour consulter ses avertissements.</p>
+            </div>
+            <button type="button" class="btn-secondary" id="refresh-warning-history-btn">Actualiser</button>
+          </div>
+          <div id="warning-history-list" class="activity-feed" aria-live="polite">
+            <p class="activity-empty">Choisis un membre pour afficher son historique.</p>
+          </div>
+        </div>
+
         <p class="log" id="mod-log"></p>
       </section>
 
@@ -317,8 +357,25 @@
 
         <div class="panel">
           <h2>Statut du bot</h2>
-          <input type="text" id="bot-status-text" placeholder="Ex: En réunion / Live / Support" />
-          <button class="btn-primary" id="set-status-btn">Mettre le statut</button>
+          <label for="bot-status-text">Texte affiché</label>
+          <input type="text" id="bot-status-text" maxlength="128" placeholder="Ex. les nouveautés du serveur" required />
+          <label for="bot-activity-type">Type d’activité</label>
+          <select id="bot-activity-type">
+            <option value="playing">Joue à</option>
+            <option value="listening">Écoute</option>
+            <option value="watching">Regarde</option>
+            <option value="competing">En compétition sur</option>
+            <option value="custom">Statut personnalisé</option>
+          </select>
+          <label for="bot-presence-status">État de présence</label>
+          <select id="bot-presence-status">
+            <option value="online">En ligne</option>
+            <option value="idle">Absent</option>
+            <option value="dnd">Ne pas déranger</option>
+            <option value="invisible">Invisible</option>
+          </select>
+          <button class="btn-primary" id="set-status-btn" type="button">Mettre à jour</button>
+          <p class="log" id="bot-presence-status-message" role="status" aria-live="polite"></p>
         </div>
       </section>
 
@@ -346,11 +403,13 @@
 
         <div class="panel">
           <p class="hint" id="settings-mode-note" hidden></p>
-          <label>Serveur</label>
-          <select id="guild-select"></select>
+          <label for="guild-select">Serveur</label>
+          <select id="guild-select" aria-describedby="settings-guild-help"></select>
+          <p class="hint" id="settings-guild-help">Les outils du panel sont réservés au serveur ZEFYXX. Le bot peut rester dans les autres serveurs sans leur appliquer les actions du panel.</p>
 
-          <label>Salon cible</label>
-          <select id="channel-select"></select>
+          <label for="channel-select">Salon cible</label>
+          <select id="channel-select" aria-describedby="settings-channel-help"></select>
+          <p class="hint" id="settings-channel-help">Ce salon reçoit les messages et les GIF envoyés depuis l’onglet Chat. Choisis un salon où le bot peut voir et envoyer des messages.</p>
 
           <div class="welcome-settings">
             <h2>Accueil automatique</h2>
@@ -358,6 +417,7 @@
               <input type="checkbox" id="welcome-enabled" />
               Accueillir les nouveaux membres
             </label>
+            <p class="hint">Active cette option pour publier un message à chaque arrivée. Le bot doit pouvoir voir et écrire dans le salon choisi.</p>
             <label for="welcome-channel-select">Salon de bienvenue</label>
             <select id="welcome-channel-select"></select>
             <label for="welcome-message">Message de bienvenue</label>
@@ -398,7 +458,7 @@
     <button class="btn-primary update-greeting-button" id="update-greeting-button" type="button">Bonjour !</button>
   </dialog>
 
-  <script src="web-bridge.js?v=usage-logs-1"></script>
-  <script src="renderer.js?v=shared-slash-command-list-1"></script>
+  <script src="web-bridge.js?v=chat-other-servers-1"></script>
+  <script src="renderer.js?v=chat-other-servers-1"></script>
 </body>
 </html>

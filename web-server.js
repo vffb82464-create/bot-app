@@ -5,7 +5,13 @@ const fs = require('node:fs');
 const path = require('node:path');
 const express = require('express');
 const session = require('express-session');
-const { Client, GatewayIntentBits, EmbedBuilder, ActivityType } = require('discord.js');
+const {
+  Client,
+  GatewayIntentBits,
+  EmbedBuilder,
+  ActivityType,
+  PermissionFlagsBits,
+} = require('discord.js');
 const {
   joinVoiceChannel,
   getVoiceConnection,
@@ -197,21 +203,42 @@ function configForUser() {
 }
 
 async function fetchDiscordJson(url, options = {}) {
-  const response = await fetch(url, {
-    ...options,
-    signal: AbortSignal.timeout(10000),
-  });
-  const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
+  const method = (options.method || 'GET').toUpperCase();
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    let response;
+    try {
+      response = await fetch(url, {
+        ...options,
+        signal: AbortSignal.timeout(10000),
+      });
+    } catch (error) {
+      if (method !== 'GET' || attempt > 0) throw error;
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      continue;
+    }
+
+    const payload = await response.json().catch(() => ({}));
+    if (response.ok) return payload;
+
     const error = new Error(
       payload.error_description
       || payload.message
       || `Le service externe a répondu ${response.status}.`
     );
     error.status = response.status;
-    throw error;
+    if (method !== 'GET' || attempt > 0 || (response.status !== 429 && response.status < 500)) {
+      throw error;
+    }
+
+    const retryAfter = Number(response.headers.get('retry-after') || payload.retry_after);
+    const delay = Number.isFinite(retryAfter)
+      ? Math.min(1500, Math.max(300, retryAfter * 1000))
+      : 500;
+    await new Promise((resolve) => setTimeout(resolve, delay));
   }
-  return payload;
+
+  throw new Error('La requête Discord a échoué après une nouvelle tentative.');
 }
 
 function safeEqual(left, right) {
@@ -258,6 +285,7 @@ async function verifyRequiredRole(req, res, next) {
       return res.status(403).json({ error: 'Impossible de vérifier ton rôle sur le serveur Discord autorisé.' });
     }
     console.error('Discord role check failed:', error.message);
+    if (!req.originalUrl.startsWith('/api/')) return res.redirect('/login?denied=discord-check');
     return res.status(503).json({ error: 'Vérification Discord momentanément indisponible. Réessaie.' });
   }
 }
@@ -420,18 +448,22 @@ app.post('/api/bot-result', (req, res) => {
 });
 
 app.get('/login', (req, res) => {
-  if (req.session.discord?.accessToken) return res.redirect('/');
+  if (req.session.discord?.accessToken && req.query.denied !== 'discord-check') return res.redirect('/');
   const denied = req.query.denied === 'role'
     ? 'Ton compte n’a pas le rôle Discord requis.'
     : req.query.denied === 'guild'
       ? 'Impossible de vérifier ton appartenance au serveur autorisé.'
-      : req.query.denied === 'oauth'
-        ? 'La connexion Discord a été annulée ou a échoué. Réessaie.'
-        : '';
+      : req.query.denied === 'discord-check'
+        ? 'Discord ne répond pas pour le moment. Ta session est conservée : réessaie la vérification dans quelques instants.'
+        : req.query.denied === 'oauth-cancelled'
+          ? 'Tu as annulé la connexion Discord. Tu peux réessayer.'
+          : req.query.denied === 'oauth-failed'
+            ? 'Discord a accepté la connexion, mais le retour vers le panel a échoué. Vérifie la configuration OAuth du panel.'
+            : '';
   res.type('html').send(`<!doctype html>
 <html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#121319"><link rel="manifest" href="/manifest.webmanifest">
-<link rel="icon" type="image/png" href="/icons/panel-192.png?v=3"><link rel="apple-touch-icon" href="/icons/panel-192.png?v=3"><link rel="stylesheet" href="/style.css?v=mobile-clean-1">
+<link rel="icon" type="image/png" href="/icons/panel-192.png?v=3"><link rel="apple-touch-icon" href="/icons/panel-192.png?v=3"><link rel="stylesheet" href="/style.css?v=slash-command-options-2">
 <script src="/pwa.js?v=slash-commands-2" defer></script>
 <title>Connexion Discord — Panel Bot</title><style>
 *{box-sizing:border-box}
@@ -455,9 +487,11 @@ h1{max-width:600px;margin:0;font-family:'Space Grotesk',Inter,system-ui,sans-ser
 h2{margin:0;font-family:'Space Grotesk',Inter,system-ui,sans-serif;font-size:26px;letter-spacing:-.03em}
 .card-copy{margin:12px 0 22px;color:#aeb0bf;font-size:14px;line-height:1.65}
 .error{margin:0 0 18px;padding:12px 14px;border:1px solid rgba(242,84,91,.32);border-radius:12px;background:rgba(242,84,91,.1);color:#ffb1b5;font-size:14px;line-height:1.5}
-.discord-button,.install-app-btn{display:flex;width:100%;min-height:50px;align-items:center;justify-content:center;gap:10px;border-radius:12px;font:600 15px Inter,system-ui,sans-serif;text-decoration:none;transition:transform .16s ease,background .16s ease,border-color .16s ease}
+.discord-button,.install-app-btn,.retry-button{display:flex;width:100%;min-height:50px;align-items:center;justify-content:center;gap:10px;border-radius:12px;font:600 15px Inter,system-ui,sans-serif;text-decoration:none;transition:transform .16s ease,background .16s ease,border-color .16s ease}
 .discord-button{border:1px solid #6974ff;background:#5865f2;color:#fff;box-shadow:0 8px 24px rgba(88,101,242,.22)}
 .discord-button:hover{transform:translateY(-1px);background:#6875ff}
+.retry-button{margin:0 0 10px;border:1px solid #363949;background:#22242f;color:#e2e3ee}
+.retry-button:hover{border-color:#6e70c9;background:#292b38}
 .discord-icon{width:21px;height:21px;fill:currentColor}
 .install-app-btn{display:flex;margin:10px 0 0;border:1px solid #363949;background:#22242f;color:#e2e3ee}
 .install-app-btn:hover{border-color:#6e70c9;background:#292b38}
@@ -516,6 +550,7 @@ body{display:block;padding:calc(24px + env(safe-area-inset-top)) 18px calc(28px 
 <p class="card-kicker">Espace sécurisé</p><h2>Connecte-toi</h2>
 <p class="card-copy">Utilise Discord pour ouvrir ta session. Nous vérifions que tu es membre du serveur et que tu possèdes au moins un des quatre rôles autorisés.</p>
 ${denied ? `<p class="error" role="alert">${denied}</p>` : ''}
+${req.query.denied === 'discord-check' ? '<a class="retry-button" href="/">Réessayer maintenant</a>' : ''}
 <a class="discord-button" href="/auth/discord"><svg class="discord-icon" viewBox="0 0 24 24" aria-hidden="true"><path d="M19.73 5.36A19.4 19.4 0 0 0 14.94 3.9l-.23.47a18 18 0 0 0-5.42 0l-.24-.47a19.3 19.3 0 0 0-4.78 1.46C1.24 9.02.42 12.6.83 16.14a19.5 19.5 0 0 0 5.86 2.96l1.27-2.06a12.7 12.7 0 0 1-2-.96l.49-.38a13.9 13.9 0 0 0 11.1 0l.5.38a12.8 12.8 0 0 1-2.02.96l1.27 2.06a19.4 19.4 0 0 0 5.86-2.96c.49-4.1-.83-7.64-3.43-10.78ZM8.54 14.5c-1.08 0-1.96-.99-1.96-2.2s.86-2.2 1.96-2.2 1.98.99 1.96 2.2c0 1.21-.86 2.2-1.96 2.2Zm6.92 0c-1.08 0-1.96-.99-1.96-2.2s.86-2.2 1.96-2.2 1.98.99 1.96 2.2c0 1.21-.86 2.2-1.96 2.2Z"/></svg>Continuer avec Discord</a>
 <button class="install-app-btn" id="install-app-btn" type="button">Installer l’application</button>
 <p class="install-app-status" id="install-app-status" role="status" aria-live="polite"></p>
@@ -556,7 +591,7 @@ app.get('/auth/discord', (req, res) => {
 
 app.get('/auth/callback', async (req, res, next) => {
   const { code, state, error } = req.query;
-  if (error) return res.redirect('/login?denied=oauth');
+  if (error) return res.redirect('/login?denied=oauth-cancelled');
   if (
     typeof code !== 'string'
     || typeof state !== 'string'
@@ -567,6 +602,7 @@ app.get('/auth/callback', async (req, res, next) => {
   }
   delete req.session.oauthState;
 
+  let oauthStage = 'échange du code';
   try {
     const token = await fetchDiscordJson('https://discord.com/api/oauth2/token', {
       method: 'POST',
@@ -580,6 +616,7 @@ app.get('/auth/callback', async (req, res, next) => {
       }),
     });
     if (!token.access_token) throw new Error('Discord n’a pas retourné de jeton OAuth.');
+    oauthStage = 'chargement du profil Discord';
     const user = await fetchDiscordJson('https://discord.com/api/users/@me', {
       headers: { Authorization: `Bearer ${token.access_token}` },
     });
@@ -598,8 +635,8 @@ app.get('/auth/callback', async (req, res, next) => {
     await new Promise((resolve, reject) => req.session.save((err) => err ? reject(err) : resolve()));
     return res.redirect('/');
   } catch (oauthError) {
-    console.error('Connexion OAuth Discord impossible :', oauthError);
-    return res.redirect('/login?denied=oauth');
+    console.error(`Connexion OAuth Discord impossible (${oauthStage}):`, oauthError.message);
+    return res.redirect('/login?denied=oauth-failed');
   }
 });
 
@@ -804,6 +841,23 @@ async function fetchTextChannel(channelId) {
   return channel;
 }
 
+async function fetchBotTextChannel(channelId) {
+  const channel = await client.channels.fetch(String(channelId || ''));
+  if (!channel || !channel.guildId || !channel.isTextBased() || channel.isThread()) {
+    throw new Error('Choisis un salon textuel valide.');
+  }
+  if (!client.guilds.cache.has(channel.guildId)) {
+    throw new Error('Le bot ne se trouve pas sur le serveur de ce salon.');
+  }
+  if (!channel.permissionsFor(client.user)?.has([
+    PermissionFlagsBits.ViewChannel,
+    PermissionFlagsBits.SendMessages,
+  ])) {
+    throw new Error('Le bot ne peut pas voir ou envoyer de messages dans ce salon.');
+  }
+  return channel;
+}
+
 function getVoiceStatus(payload) {
   sendEvent('voice-status', payload);
 }
@@ -831,37 +885,15 @@ async function leaveGuild(guild) {
   }
 }
 
-async function leaveOtherGuildsOnStartup() {
-  if (!client.guilds.cache.has(ALLOWED_GUILD_ID)) {
-    recordActivity(
-      'error',
-      `Serveur autorisé ${ALLOWED_GUILD_ID} introuvable. Aucun serveur ne sera quitté.`,
-      { guildId: ALLOWED_GUILD_ID }
-    );
-    return;
-  }
-
-  for (const guild of client.guilds.cache.values()) {
-    if (guild.id !== ALLOWED_GUILD_ID) await leaveGuild(guild);
-  }
-}
-
 client.once('ready', async () => {
   botLoginError = null;
   recordActivity('success', `Bot connecté en tant que ${client.user.tag}.`);
-  await leaveOtherGuildsOnStartup();
   broadcastBotStatus({ connected: true, tag: client.user.tag });
 });
 
 client.on('error', (error) => {
   recordActivity('error', `Erreur du bot : ${error.message}`);
   broadcastBotStatus({ connected: false, error: error.message });
-});
-
-client.on('guildCreate', (guild) => {
-  if (guild.id === ALLOWED_GUILD_ID) return;
-  recordActivity('warning', `Le bot a rejoint « ${guild.name} » et va le quitter.`, { guildId: guild.id });
-  void leaveGuild(guild);
 });
 
 function getMessageMedia(message) {
@@ -1043,6 +1075,34 @@ async function executeCommand(name, args) {
         .filter((channel) => channel?.isTextBased() && !channel.isThread())
         .map((channel) => ({ id: channel.id, name: channel.name }));
     }
+    case 'getMessageGuilds': {
+      if (BOT_SYNC_ONLY) {
+        const connected = remoteBotSnapshot.connected
+          && Date.now() - remoteBotSnapshot.lastSeen < 120000;
+        return connected ? remoteBotSnapshot.guilds : [];
+      }
+      return client.guilds.cache
+        .map((guild) => ({ id: guild.id, name: guild.name }))
+        .sort((left, right) => left.name.localeCompare(right.name));
+    }
+    case 'getMessageChannels': {
+      const guildId = String(args[0] || '');
+      if (BOT_SYNC_ONLY) return requestHostedBotCommand(name, [guildId]);
+      const guild = client.guilds.cache.get(guildId);
+      if (!guild) throw new Error('Le bot ne se trouve pas sur ce serveur.');
+      const channels = await guild.channels.fetch();
+      return channels
+        .filter((channel) => (
+          channel
+          && channel.isTextBased()
+          && !channel.isThread()
+          && channel.permissionsFor(client.user)?.has([
+            PermissionFlagsBits.ViewChannel,
+            PermissionFlagsBits.SendMessages,
+          ])
+        ))
+        .map((channel) => ({ id: channel.id, name: channel.name }));
+    }
     case 'getGuildEmojis': {
       const guild = requireAllowedGuild(ALLOWED_GUILD_ID);
       const emojis = await guild.emojis.fetch();
@@ -1131,22 +1191,34 @@ async function executeCommand(name, args) {
     }
     case 'getActivityLogs':
       return BOT_SYNC_ONLY ? remoteBotSnapshot.logs : activityLogs;
-    case 'sendMessage': {
+    case 'getWarnings': {
       const input = args[0] || {};
-      const channel = await fetchTextChannel(input.channelId);
+      const guild = requireAllowedGuild(input.guildId);
+      if (typeof input.userId !== 'string' || !input.userId) {
+        throw new Error('Choisis un membre pour consulter les avertissements.');
+      }
+      if (BOT_SYNC_ONLY) return requestHostedBotCommand(name, args);
+      return warnings
+        .filter((warning) => warning.guildId === guild.id && warning.userId === input.userId)
+        .sort((left, right) => new Date(right.createdAt).getTime() - new Date(left.createdAt).getTime());
+    }
+    case 'sendMessage': {
+      if (BOT_SYNC_ONLY) return requestHostedBotCommand(name, args);
+      const input = args[0] || {};
+      const channel = await fetchBotTextChannel(input.channelId);
       const content = String(input.content || '').trim();
       if (!content || content.length > 2000) throw new Error('Le message doit contenir entre 1 et 2 000 caractères.');
       const payload = input.replyToMessageId
         ? { content, reply: { messageReference: input.replyToMessageId } }
         : content;
       await channel.send(payload);
-      recordActivity('info', `Message envoyé dans #${channel.name}.`, { guildId: ALLOWED_GUILD_ID });
+      recordActivity('info', `Message envoyé dans #${channel.name}.`, { guildId: channel.guildId });
       return true;
     }
     case 'searchGifs': {
       const query = String(args[0] || '').trim();
       if (!query || query.length > 100) throw new Error('Entre un mot ou une expression (100 caractères maximum).');
-      if (!GIPHY_API_KEY) throw new Error('Configure GIPHY_API_KEY dans les variables d’environnement du site.');
+      if (!GIPHY_API_KEY) throw new Error('La recherche GIF nécessite GIPHY_API_KEY dans les variables Render. Tu peux aussi coller un lien direct GIPHY se terminant par .gif.');
       const url = new URL('https://api.giphy.com/v1/gifs/search');
       url.search = new URLSearchParams({
         q: query,
@@ -1176,16 +1248,23 @@ async function executeCommand(name, args) {
         .filter(Boolean);
     }
     case 'sendGif': {
+      if (BOT_SYNC_ONLY) return requestHostedBotCommand(name, args);
       const input = args[0] || {};
-      const gifUrl = new URL(input.url);
+      let gifUrl;
+      try {
+        gifUrl = new URL(input.url);
+      } catch {
+        throw new Error('GIF invalide.');
+      }
       if (
         gifUrl.protocol !== 'https:'
         || (gifUrl.hostname !== 'giphy.com' && !gifUrl.hostname.endsWith('.giphy.com'))
-      ) throw new Error('Seuls les GIFs GIPHY peuvent être envoyés.');
-      const channel = await fetchTextChannel(input.channelId);
+        || !/\.gif$/i.test(gifUrl.pathname)
+      ) throw new Error('Colle un lien direct vers un fichier GIF GIPHY se terminant par .gif.');
+      const channel = await fetchBotTextChannel(input.channelId);
       const embed = new EmbedBuilder().setImage(gifUrl.toString()).setColor(0x5865f2).setFooter({ text: 'Powered by GIPHY' });
       await channel.send({ embeds: [embed] });
-      recordActivity('info', `GIF envoyé dans #${channel.name}.`, { guildId: ALLOWED_GUILD_ID });
+      recordActivity('info', `GIF envoyé dans #${channel.name}.`, { guildId: channel.guildId });
       return true;
     }
     case 'sendAnnouncement': {
@@ -1261,10 +1340,31 @@ async function executeCommand(name, args) {
     }
     case 'setBotStatus': {
       if (!client.user) throw new Error('Bot non connecté.');
-      const text = String(args[0] || '').trim() || 'Panel Bot';
+      const input = args[0] || {};
+      const text = typeof input.text === 'string' ? input.text.trim() : '';
+      const activityTypes = {
+        playing: ActivityType.Playing,
+        listening: ActivityType.Listening,
+        watching: ActivityType.Watching,
+        competing: ActivityType.Competing,
+        custom: ActivityType.Custom,
+      };
+      const presenceStatuses = new Set(['online', 'idle', 'dnd', 'invisible']);
+      if (!text || text.length > 128) {
+        throw new Error('Le texte du statut doit contenir entre 1 et 128 caractères.');
+      }
+      if (!Object.hasOwn(activityTypes, input.type)) {
+        throw new Error('Choisis un type d’activité valide.');
+      }
+      if (!presenceStatuses.has(input.status)) {
+        throw new Error('Choisis un état de présence valide.');
+      }
+      const activity = input.type === 'custom'
+        ? { name: 'Custom Status', state: text, type: ActivityType.Custom }
+        : { name: text, type: activityTypes[input.type] };
       await client.user.setPresence({
-        activities: [{ name: text, type: ActivityType.Custom }],
-        status: 'online',
+        activities: [activity],
+        status: input.status,
       });
       return true;
     }
@@ -1358,8 +1458,9 @@ async function executeCommand(name, args) {
 
 const allowedCommands = new Set([
   'getConfig', 'saveConfig', 'getGuilds', 'getChannels', 'getGuildEmojis', 'getVoiceChannels',
+  'getMessageGuilds', 'getMessageChannels',
   'getMembers', 'getBots', 'getStats', 'getServerOverview', 'leaveOtherServers',
-  'getActivityLogs', 'sendMessage', 'searchGifs', 'sendGif', 'sendAnnouncement',
+  'getActivityLogs', 'getWarnings', 'sendMessage', 'searchGifs', 'sendGif', 'sendAnnouncement',
   'getSlashCommands', 'createSlashCommand', 'deleteSlashCommand',
   'kickMember', 'banMember', 'timeoutMember', 'warnMember', 'setBotStatus',
   'joinVoice', 'leaveVoice', 'disconnectVoice', 'playMusic', 'pauseMusic',
